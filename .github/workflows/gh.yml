@@ -7,6 +7,9 @@ on:
       - main
       - 'fit/**'
       - 'fix/**'
+  pull_request:
+    branches:
+      - main  
 
 jobs:
   build:
@@ -28,10 +31,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync
+          uv sync --frozen 
 
       - name: Run Linter
-        run: uv run ruff check . --fix
+        run: uv run ruff check .
         continue-on-error: true
 
       - name: Run Tests
