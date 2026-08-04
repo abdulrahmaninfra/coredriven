@@ -1,11 +1,11 @@
 import sqlite3
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Depends
+
+from fastapi import Depends, FastAPI, HTTPException
 
 from src.api.schema import UserCreate, UserResponse
-from src.database.read import GetUser
-from src.database.create import CreateNewUser
-from src.database.connect import get_db_connection, create_db
+from src.database.customers.connect import create_db, get_db_connection
+from src.database.customers.create import CreateNewUser
 
 
 @asynccontextmanager
