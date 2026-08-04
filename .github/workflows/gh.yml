@@ -38,5 +38,4 @@ jobs:
         continue-on-error: true
 
       - name: Run Tests
-        run: |
-          uv run pytest || [ $? -eq 5 ]
+        run: uv run python -m pytest src || [ $? -eq 5 ]
