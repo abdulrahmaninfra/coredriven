@@ -39,4 +39,4 @@ jobs:
 
       - name: Run Tests
         run: |
-          uv run pytest --suppress-no-test-exit-code
+          uv run pytest || [ $? -eq 5 ]
