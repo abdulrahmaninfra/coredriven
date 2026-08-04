@@ -1,1 +1,40 @@
-# ci/cd
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'fit/**'
+      - 'fix/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: astral-sh/setup-uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install dependencies
+        run: |
+          uv sync
+
+      - name: Run Linter
+        run: |
+          uv run ruff check .
+          continue-on-error: true
+
+      - name: Run Tests
+        run: |
+          uv run pytest
