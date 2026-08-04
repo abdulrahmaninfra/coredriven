@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     PORT: int 
 
 
-    HASHING_ALGORITHM: str
+    JWT_ALGORITHM: str
     PASSWORD_HASH_SECRET_KEY: str
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
 
