@@ -1,0 +1,18 @@
+[project]
+name = "coredriven"
+version = "0.0.1"
+description = "POS and Internet Cafe management"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi==0.104.1",
+    "passlib==1.7.4",
+    "pydantic==2.13.4",
+    "pydantic-core==2.46.4",
+    "pydantic-settings==2.14.2",
+    "pysqlite3>=0.6.0",
+    "python-dotenv==1.2.2",
+    "redis==5.0.1",
+    "uvicorn==0.24.0",
+    "websockets==12.0",
+]
