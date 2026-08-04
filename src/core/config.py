@@ -15,18 +15,24 @@ class Settings(BaseSettings):
     API_VERSION: str = ""
 
     DATABASE_URL: str = ""
-    DATABASE_NAME: str = str(os.getenv("DATABASE_NAME"))
-    # DATABASE_PASSWORD: str = str(os.getenv("DATABASE_PASSWORD"))
+    DATABASE_NAME: str
 
-    ALLOWED_ORIGINS: list[str] = [
-        f"localhost:{os.getenv('PORT')}",
-        f"127.0.0.1:{os.getenv('PORT')}",
-    ]
-    ALLOWED_METHODS: list[str] = ["GET", "POST", "PUT", "DELETE"]
 
-    HOST: str = str(os.getenv("HOST"))
-    PORT: int = int(os.getenv("PORT"))
-    DEBUG: bool = False
+    HOST: str
+    PORT: int 
+
+
+    HASHING_ALGORITHM: str
+    PASSWORD_HASH_SECRET_KEY: str
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
+
+    # ALLOWED_ORIGINS: list[str] = [
+    #     f"localhost:{os.getenv('PORT')}",
+    #     f"127.0.0.1:{os.getenv('PORT')}",
+    # ]
+    # ALLOWED_METHODS: list[str] = ["GET", "POST", "PUT", "DELETE"]
+
+
 
 
 @lru_cache
