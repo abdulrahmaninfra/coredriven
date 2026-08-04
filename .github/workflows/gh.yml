@@ -31,9 +31,8 @@ jobs:
           uv sync
 
       - name: Run Linter
-        run: |
-          uv run ruff check . --fix
-          continue-on-error: true
+        run: uv run ruff check . --fix
+        continue-on-error: true
 
       - name: Run Tests
         run: |
