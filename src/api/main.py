@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from src.api.deps import get_current_user
 from src.api.schema import Token, UserCreate, UserResponse
 from src.core.security import create_access_token, verify_password
 from src.database.customers.connect import create_db, get_db_connection
@@ -49,3 +50,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), conn: sqlite3.Connec
 
     access_token = create_access_token(data={"sub": user["username"]})
     return Token(access_token=access_token)
+
+
+@app.get("/users/me", response_model=UserResponse)
+def read_users_me(current_user: dict = Depends(get_current_user)):
+    return current_user
