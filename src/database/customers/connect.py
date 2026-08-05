@@ -1,8 +1,8 @@
 import sqlite3
 
-from src.core.config import Settings
+from src.core.config import get_settings
 
-settings = Settings()
+settings = get_settings()
 
 def create_db():
     conn = sqlite3.connect(settings.DATABASE_NAME)
