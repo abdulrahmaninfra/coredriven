@@ -1,15 +1,12 @@
-import sqlite3
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
-from src.api.deps import get_current_user
-from src.api.schema import Token, UserCreate, UserResponse
-from src.core.security import create_access_token, verify_password
-from src.database.customers.connect import create_db, get_db_connection
-from src.database.customers.create import CreateNewUser
-from src.database.customers.read import GetUser
+from src.api.auth import router as login_router
+from src.core.config import get_settings
+from src.database.customers.connect import create_db
 
 
 @asynccontextmanager
@@ -18,40 +15,29 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+def create_application() -> FastAPI:
+    settings = get_settings()
 
-@app.post("/users", response_model=UserResponse)
-def create_user(create_new_user: UserCreate, conn: sqlite3.Connection= Depends(get_db_connection)):
-    try:
-        user_creator = CreateNewUser(
-            username=create_new_user.username,
-            password=create_new_user.password,
-            phone_number=create_new_user.phone_number,
-            balance=create_new_user.balance
-        )
+    application = FastAPI(
+        title=settings.API_TITLE,
+        description=settings.API_DESCRIPTION,
+        version=settings.API_VERSION,
+        lifespan=lifespan,
+    )
 
-        new_user = user_creator.create_user(conn)
-        return dict(new_user)
+    application.add_middleware(GZipMiddleware, minimum_size=1000)
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=settings.ALLOWED_METHODS,
+        allow_headers=["*"],
+        max_age=86400,
+    )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    application.include_router(login_router)
 
-
-@app.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), conn: sqlite3.Connection = Depends(get_db_connection)):
-    user = GetUser(conn).get_user_by_username(form_data.username)
-
-    if user is None or not verify_password(form_data.password, user["password_hash"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    access_token = create_access_token(data={"sub": user["username"]})
-    return Token(access_token=access_token)
+    return application
 
 
-@app.get("/users/me", response_model=UserResponse)
-def read_users_me(current_user: dict = Depends(get_current_user)):
-    return current_user
+app = create_application()
