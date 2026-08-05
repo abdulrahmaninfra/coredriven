@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from passlib.hash import argon2
-from config import Settings
+from src.core.config import Settings
 
 settings = Settings()
 
