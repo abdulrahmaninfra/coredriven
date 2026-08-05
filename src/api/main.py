@@ -1,11 +1,12 @@
-import sqlite3
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
-from src.api.schema import UserCreate, UserResponse
-from src.database.customers.connect import create_db, get_db_connection
-from src.database.customers.create import CreateNewUser
+from src.api.auth import router as login_router
+from src.core.config import get_settings
+from src.database.customers.connect import create_db
 
 
 @asynccontextmanager
@@ -14,20 +15,29 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+def create_application() -> FastAPI:
+    settings = get_settings()
 
-@app.post("/users", response_model=UserResponse)
-def create_user(create_new_user: UserCreate, conn: sqlite3.Connection= Depends(get_db_connection)):
-    try:
-        user_creator = CreateNewUser(
-            username=create_new_user.username,
-            password=create_new_user.password,
-            phone_number=create_new_user.phone_number,
-            balance=create_new_user.balance
-        )
+    application = FastAPI(
+        title=settings.API_TITLE,
+        description=settings.API_DESCRIPTION,
+        version=settings.API_VERSION,
+        lifespan=lifespan,
+    )
 
-        new_user = user_creator.create_user(conn)
-        return dict(new_user)
+    application.add_middleware(GZipMiddleware, minimum_size=1000)
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=settings.ALLOWED_METHODS,
+        allow_headers=["*"],
+        max_age=86400,
+    )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    application.include_router(login_router)
+
+    return application
+
+
+app = create_application()

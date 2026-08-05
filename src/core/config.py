@@ -1,4 +1,3 @@
-import os
 from functools import lru_cache
 
 from dotenv import load_dotenv
@@ -10,23 +9,23 @@ load_dotenv()
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
-    API_TITLE: str = ""
-    API_DESCRIPTION: str = ""
-    API_VERSION: str = ""
+    API_TITLE: str = "CoreDriven API"
+    API_DESCRIPTION: str = "POS and Internet Cafe management"
+    API_VERSION: str = "0.1.0"
 
-    DATABASE_URL: str = ""
-    DATABASE_NAME: str = str(os.getenv("DATABASE_NAME"))
-    # DATABASE_PASSWORD: str = str(os.getenv("DATABASE_PASSWORD"))
+    DATABASE_NAME: str 
 
-    ALLOWED_ORIGINS: list[str] = [
-        f"localhost:{os.getenv('PORT')}",
-        f"127.0.0.1:{os.getenv('PORT')}",
-    ]
+    HOST: str  
+    PORT: int 
+
+    JWT_ALGORITHM: str
+    PASSWORD_HASH_SECRET_KEY: str
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
+
+    ALLOWED_ORIGINS: list[str] = ["*"]
     ALLOWED_METHODS: list[str] = ["GET", "POST", "PUT", "DELETE"]
 
-    HOST: str = str(os.getenv("HOST"))
-    PORT: int = int(os.getenv("PORT"))
-    DEBUG: bool = False
+
 
 
 @lru_cache

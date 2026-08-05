@@ -1,7 +1,8 @@
 import sqlite3
-from ..core.config import Settings
 
-settings = Settings()
+from src.core.config import get_settings
+
+settings = get_settings()
 
 def create_db():
     conn = sqlite3.connect(settings.DATABASE_NAME)
@@ -9,7 +10,7 @@ def create_db():
 
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS gamers
+        CREATE TABLE IF NOT EXISTS customers
         (
         id PRIMARY KEY,
         username VARCHAR(50) UNIQUE NOT NULL,

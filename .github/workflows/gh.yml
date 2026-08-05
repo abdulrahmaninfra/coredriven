@@ -27,15 +27,14 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v7.0.0
         with:
-          python-version-file: "pyproject.toml"
+          python-version-file: ".python-version"
 
       - name: Install dependencies
         run: |
-          uv sync --frozen 
+          uv sync --frozen
 
       - name: Run Linter
         run: uv run ruff check .
-        continue-on-error: true
 
       - name: Run Tests
-        run: uv run python -m pytest src || [ $? -eq 5 ]
+        run: uv run python -m pytest

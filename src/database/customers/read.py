@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Optional
+
 
 class GetUser:
     def __init__(self, conn: sqlite3.Connection):
@@ -23,7 +23,7 @@ class GetUser:
         return cursor.fetchone()
 
 
-    def get_user(self, username: Optional[str] = None, phone_number: Optional[str] = None):
+    def get_user(self, username: str | None = None, phone_number: str | None = None):
         conditions = []
         params = []
 
