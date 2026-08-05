@@ -1,19 +1,16 @@
 import sqlite3
 import uuid
 from passlib.hash import argon2
-
+from src.core.security import hash_password
 
 class CreateNewUser:
     def __init__(self, username: str, password: str, phone_number: str, balance: float):
         self.id = str(uuid.uuid4())
         self.username = username
-        self.password = self._hash_password(password)
+        self.password = self.hash_password(password)
         self.phone_number = phone_number
         self.balance = balance
 
-
-    def _hash_password(self, password: str) -> str:
-        return argon2.hash(password)
 
     def create_user(self, conn: sqlite3.Connection):
         cursor = conn.cursor()

@@ -1,9 +1,8 @@
 import sqlite3
 from passlib.hash import argon2
 from typing import Optional
+from src.core.security import hash_password as _hash_password
 
-def _hash_password(password: str) -> str:
-    return argon2.hash(password)
 
 def UpdateUser(
     conn: sqlite3.Connection, 
