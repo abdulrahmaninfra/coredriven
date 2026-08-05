@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
 import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from passlib.hash import argon2
 from src.core.config import Settings
 
@@ -40,6 +42,24 @@ def decode_token(token: str) -> dict:
     except jwt.PyJWTError as e:
         print(f"Error decoding token: {e}")
         return {}
-    
 
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+
+def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
+    """
+    FastAPI dependency — extracts and validates the JWT from the
+    Authorization: Bearer <token> header.
+    Use with:  current_user: str = Depends(get_current_user)
+    Returns the username stored in the token's 'sub' claim.
+    """
+    payload = decode_token(token)
+    username: str | None = payload.get("sub")
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return username
