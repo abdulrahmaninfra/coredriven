@@ -1,51 +1,50 @@
 import sqlite3
-from passlib.hash import argon2
-from typing import Optional
+
 from src.core.security import hash_password as _hash_password
 
 
 def UpdateUser(
-    conn: sqlite3.Connection, 
+    conn: sqlite3.Connection,
     current_username: str,
-    username: Optional[str] = None,
-    phone_number: Optional[str] = None,
-    password: Optional[str] = None,
-    balance: Optional[float] = None,
-    is_active: Optional[bool] = None
+    username: str | None = None,
+    phone_number: str | None = None,
+    password: str | None = None,
+    balance: float | None = None,
+    is_active: bool | None = None,
 ):
-
     cursor = conn.cursor()
     conditions = []
     params = []
-    
+
     if username is not None:
         conditions.append("username = ?")
         params.append(username)
-        
+
     if phone_number is not None:
         conditions.append("phone_number = ?")
         params.append(phone_number)
-        
+
     if password is not None:
         hashed = _hash_password(password)
         conditions.append("password_hash = ?")
         params.append(hashed)
-        
+
     if balance is not None:
         conditions.append("balance = ?")
-        params.append(balance)        
+        params.append(balance)
 
     if is_active is not None:
         conditions.append("is_active = ?")
         params.append(is_active)
-        
+
     if not conditions:
         print("No fields to update")
-        return
+        return False
 
     params.append(current_username)
-    
-    query = f"UPDATE customers SET {', '.join(conditions)} WHERE username = ?"
+
+    set_clause = ", ".join(conditions)
+    query = f"UPDATE customers SET {set_clause} WHERE username = ?"
     cursor.execute(query, params)
     conn.commit()
-    
+    return True
