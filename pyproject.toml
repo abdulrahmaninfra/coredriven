@@ -31,3 +31,8 @@ pythonpath = ["src"]
 filterwarnings = [
     "ignore::SyntaxWarning",
 ]
+
+[tool.ruff.lint]
+# B008: Depends() in argument defaults is the idiomatic FastAPI pattern
+# BLE001: broad except is used intentionally to normalize error handling
+ignore = ["B008", "BLE001"]
