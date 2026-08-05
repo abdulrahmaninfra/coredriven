@@ -44,4 +44,4 @@ Runs after cloning or when `pyproject.toml`/`uv.lock` changes.
 
 ## Shout out
 
-Shout out to moaz.
+Shout out to hamada.
