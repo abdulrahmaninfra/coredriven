@@ -12,3 +12,8 @@ class UserResponse(BaseModel):
     username: str
     phone_number: str
     balance: float
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
