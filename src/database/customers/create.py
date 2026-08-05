@@ -1,7 +1,8 @@
 import sqlite3
 import uuid
-from passlib.hash import argon2
+
 from src.core.security import hash_password
+
 
 class CreateNewUser:
     def __init__(self, username: str, password: str, phone_number: str, balance: float):
@@ -18,6 +19,5 @@ class CreateNewUser:
                        (self.id, self.username, self.password, self.balance, self.phone_number))
         conn.commit()
 
-        cursor.execute("SELECT * FROM customers WHERE username = ? AND password_hash = ?",
-                       (self.username, self.password))
+        cursor.execute("SELECT * FROM customers WHERE id = ?", (self.id,))
         return cursor.fetchone()
