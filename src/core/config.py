@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     API_VERSION: str = "0.1.0"
 
     DATABASE_NAME: str 
+    DATABASE_URL: str
+
 
     HOST: str  
     PORT: int 

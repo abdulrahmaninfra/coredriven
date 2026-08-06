@@ -15,6 +15,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.32",
     "redis>=5.0.1",
+    "sqlalchemy>=2.0.51",
     "uvicorn[standard]>=0.24.0",
     "websockets>=12.0",
 ]

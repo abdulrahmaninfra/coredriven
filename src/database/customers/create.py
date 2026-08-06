@@ -1,7 +1,9 @@
-import sqlite3
 import uuid
 
+from sqlalchemy.orm import Session
+
 from src.core.security import hash_password
+from src.database.customers.models import Customer
 
 
 class CreateNewUser:
@@ -12,12 +14,15 @@ class CreateNewUser:
         self.phone_number = phone_number
         self.balance = balance
 
-
-    def create_user(self, conn: sqlite3.Connection):
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO customers (id, username, password_hash, balance, phone_number) VALUES (?, ?, ?, ?, ?)",
-                       (self.id, self.username, self.password, self.balance, self.phone_number))
-        conn.commit()
-
-        cursor.execute("SELECT * FROM customers WHERE id = ?", (self.id,))
-        return cursor.fetchone()
+    def create_user(self, db: Session):
+        customer = Customer(
+            id=self.id,
+            username=self.username,
+            password_hash=self.password,
+            balance=self.balance,
+            phone_number=self.phone_number,
+        )
+        db.add(customer)
+        db.commit()
+        db.refresh(customer)
+        return customer

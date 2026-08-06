@@ -8,11 +8,11 @@ os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
 
 from fastapi.testclient import TestClient
 
-from src.api.main import app
+from src.api.main import auth
 
 
 def test_register_login_and_current_user():
-    with TestClient(app) as client:
+    with TestClient(auth) as client:
         response = client.post(
             "/auth/register",
             json={
@@ -40,7 +40,7 @@ def test_register_login_and_current_user():
 
 
 def test_register_duplicate_username():
-    with TestClient(app) as client:
+    with TestClient(auth) as client:
         payload = {
             "username": "bob",
             "password": "secret123",
@@ -52,7 +52,7 @@ def test_register_duplicate_username():
 
 
 def test_login_wrong_password():
-    with TestClient(app) as client:
+    with TestClient(auth) as client:
         client.post(
             "/auth/register",
             json={
@@ -66,3 +66,45 @@ def test_login_wrong_password():
             "/auth/login", data={"username": "carol", "password": "wrong"}
         )
         assert response.status_code == 401
+
+
+def test_update_user_fields():
+    with TestClient(auth) as client:
+        payload = {
+            "username": "dave",
+            "password": "secret123",
+            "phone_number": "22222",
+            "balance": 10.0,
+        }
+        assert client.post("/auth/register", json=payload).status_code == 201
+
+        token = client.post(
+            "/auth/login", data={"username": "dave", "password": "secret123"}
+        ).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        response = client.put(
+            "/auth/update",
+            json={"phone_number": "99999", "balance": 42.5},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["phone_number"] == "99999"
+        assert response.json()["balance"] == 42.5
+
+        assert client.put("/auth/update", json={}, headers=headers).status_code == 400
+
+        response = client.put(
+            "/auth/update",
+            json={"username": "dave2"},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["username"] == "dave2"
+
+        assert (
+            client.post(
+                "/auth/login", data={"username": "dave2", "password": "secret123"}
+            ).status_code
+            == 200
+        )

@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-
+from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
 class UserCreate(BaseModel):
     username: str
@@ -9,9 +9,19 @@ class UserCreate(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     username: str
     phone_number: str
     balance: float
+
+
+class UserUpdate(BaseModel):
+    username: Optional[str] | None = None
+    phone_number: Optional[str] | None = None
+    password: Optional[str] | None = None
+    balance: Optional[float] | None = None
+    is_active: Optional[bool] | None = None
 
 
 class Token(BaseModel):

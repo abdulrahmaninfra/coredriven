@@ -1,26 +1,31 @@
-import sqlite3
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from src.database.customers.models import Customer
 
 
 class DeleteUser:
-    def __init__(self, username: str | None, phone_number: str | None, conn: sqlite3.Connection):
-        self.conn = conn
+    def __init__(self, username: str | None, phone_number: str | None, db: Session):
+        self.db = db
         self.username = username
         self.phone_number = phone_number
-
 
     def delete_by_phone_number(self):
         if self.phone_number is None:
             print("Phone number is required")
             return False
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("DELETE FROM customers WHERE phone_number = ?", (self.phone_number,))
-            self.conn.commit()
-            return True
+            deleted = (
+                self.db.query(Customer)
+                .filter(Customer.phone_number == self.phone_number)
+                .delete()
+            )
+            self.db.commit()
+            return deleted > 0
 
-        except sqlite3.Error as e:
+        except SQLAlchemyError as e:
             print(f"Database error: {e}")
-            self.conn.rollback()
+            self.db.rollback()
             return False
 
     def delete_by_username(self):
@@ -28,12 +33,15 @@ class DeleteUser:
             print("Username is required")
             return False
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("DELETE FROM customers WHERE username = ?", (self.username,))
-            self.conn.commit()
-            return True
+            deleted = (
+                self.db.query(Customer)
+                .filter(Customer.username == self.username)
+                .delete()
+            )
+            self.db.commit()
+            return deleted > 0
 
-        except sqlite3.Error as e:
+        except SQLAlchemyError as e:
             print(f"Database error: {e}")
-            self.conn.rollback()
+            self.db.rollback()
             return False
