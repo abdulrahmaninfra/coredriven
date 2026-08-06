@@ -7,6 +7,8 @@ on:
       - main
       - 'fit/**'
       - 'fix/**'
+      - 'feat/**'
+      - 'refactor/**'
   pull_request:
     branches:
       - main  
