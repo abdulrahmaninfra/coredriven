@@ -12,10 +12,10 @@ from src.database.customers.read import GetUser
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+auth = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@auth.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user_data: UserCreate, conn: sqlite3.Connection = Depends(get_db_connection)):
     existing = GetUser(conn).get_user_by_username(user_data.username)
     if existing:
@@ -48,7 +48,7 @@ def register(user_data: UserCreate, conn: sqlite3.Connection = Depends(get_db_co
         )
 
 
-@router.post("/login", response_model=Token)
+@auth.post("/login", response_model=Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     conn: sqlite3.Connection = Depends(get_db_connection),
@@ -72,6 +72,6 @@ def login(
     return Token(access_token=access_token)
 
 
-@router.get("/users/me", response_model=UserResponse)
+@auth.get("/users/me", response_model=UserResponse)
 def read_users_me(current_user: dict = Depends(get_current_user)):
     return dict(current_user)
