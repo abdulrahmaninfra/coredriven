@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from src.api.auth import router as login_router
+from src.api.auth import auth as authentication_router
 from src.core.config import get_settings
 from src.database.customers.connect import create_db
 
@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-def create_application() -> FastAPI:
+def create_auth_application() -> FastAPI:
     settings = get_settings()
 
     application = FastAPI(
@@ -35,9 +35,9 @@ def create_application() -> FastAPI:
         max_age=86400,
     )
 
-    application.include_router(login_router)
+    application.include_router(authentication_router)
 
     return application
 
 
-app = create_application()
+auth = create_auth_application()
