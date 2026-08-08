@@ -5,10 +5,12 @@ from src.core.config import get_settings
 
 settings = get_settings()
 
-engine = create_engine(
-    f"sqlite:///{settings.DATABASE_NAME}",
-    connect_args={"check_same_thread": False},
-)
+# Only add SQLite-specific args when using SQLite
+connect_args = {}
+if settings.DATABASE_URL.startswith("sqlite"):
+    connect_args["check_same_thread"] = False
+
+engine = create_engine(settings.DATABASE_URL, **connect_args)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 

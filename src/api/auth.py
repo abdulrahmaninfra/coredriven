@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import SQLAlchemyError
@@ -7,14 +7,12 @@ from sqlalchemy.orm import Session
 
 from src.api.schema import Token, UserCreate, UserResponse, UserUpdate
 from src.core.security import create_access_token, get_current_user, verify_password
-
 from src.database.customers.create import CreateNewUser
 from src.database.customers.database import get_db
+from src.database.customers.delete import DeleteUser
 from src.database.customers.models import Customer
 from src.database.customers.read import GetUser
 from src.database.customers.update import UpdateUser
-from src.database.customers.delete import DeleteUser
-
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +110,7 @@ def update_user(
     return GetUser(db).get_user_by_username(username)
 
 @auth.delete("/delete")
-def delete_user(username: Optional[str] = None, phone_number: Optional[str] = None, db: Session = Depends(get_db),current_user: Customer = Depends(get_current_user)):
+def delete_user(username: str | None = None, phone_number: str | None = None, db: Session = Depends(get_db),current_user: Customer = Depends(get_current_user)):
 
     if username and username != current_user.username:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="you are not authorized to delete this user")
@@ -123,7 +121,6 @@ def delete_user(username: Optional[str] = None, phone_number: Optional[str] = No
     if not deleted:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
 
-    return 
 
 @auth.get("/users/me", response_model=UserResponse)
 def read_users_me(current_user: Customer = Depends(get_current_user)):

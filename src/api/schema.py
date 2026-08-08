@@ -1,5 +1,6 @@
+
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+
 
 class UserCreate(BaseModel):
     username: str
@@ -17,11 +18,11 @@ class UserResponse(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    username: Optional[str] | None = None
-    phone_number: Optional[str] | None = None
-    password: Optional[str] | None = None
-    balance: Optional[float] | None = None
-    is_active: Optional[bool] | None = None
+    username: str | None = None
+    phone_number: str | None = None
+    password: str | None = None
+    balance: float | None = None
+    is_active: bool | None = None
 
 
 class Token(BaseModel):
