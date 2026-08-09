@@ -1,10 +1,12 @@
-import sqlite3
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from src.core.security import hash_password as _hash_password
+from src.database.customers.models import Customer
 
 
 def UpdateUser(
-    conn: sqlite3.Connection,
+    db: Session,
     current_username: str,
     username: str | None = None,
     phone_number: str | None = None,
@@ -12,39 +14,37 @@ def UpdateUser(
     balance: float | None = None,
     is_active: bool | None = None,
 ):
-    cursor = conn.cursor()
-    conditions = []
-    params = []
+    values = {}
 
     if username is not None:
-        conditions.append("username = ?")
-        params.append(username)
+        values["username"] = username
 
     if phone_number is not None:
-        conditions.append("phone_number = ?")
-        params.append(phone_number)
+        values["phone_number"] = phone_number
 
     if password is not None:
-        hashed = _hash_password(password)
-        conditions.append("password_hash = ?")
-        params.append(hashed)
+        values["password_hash"] = _hash_password(password)
 
     if balance is not None:
-        conditions.append("balance = ?")
-        params.append(balance)
+        values["balance"] = balance
 
     if is_active is not None:
-        conditions.append("is_active = ?")
-        params.append(is_active)
+        values["is_active"] = is_active
 
-    if not conditions:
+    if not values:
         print("No fields to update")
         return False
 
-    params.append(current_username)
+    try:
+        result = (
+            db.query(Customer)
+            .filter(Customer.username == current_username)
+            .update(values)
+        )
+        db.commit()
+        return result > 0
 
-    set_clause = ", ".join(conditions)
-    query = f"UPDATE customers SET {set_clause} WHERE username = ?"
-    cursor.execute(query, params)
-    conn.commit()
-    return True
+    except SQLAlchemyError as e:
+        print(f"Database error: {e}")
+        db.rollback()
+        return False

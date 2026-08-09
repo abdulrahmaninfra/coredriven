@@ -6,7 +6,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from src.api.auth import auth as authentication_router
 from src.core.config import get_settings
-from src.database.customers.connect import create_db
+from src.database.customers.database import create_db
 
 
 @asynccontextmanager

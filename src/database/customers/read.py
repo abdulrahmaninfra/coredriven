@@ -1,44 +1,28 @@
-import sqlite3
+from sqlalchemy.orm import Session
+
+from src.database.customers.models import Customer
 
 
 class GetUser:
-    def __init__(self, conn: sqlite3.Connection):
-        self.conn = conn
+    def __init__(self, db: Session):
+        self.db = db
 
     def get_all_users(self):
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM customers;")
-        return cursor.fetchall()
-
+        return self.db.query(Customer).all()
 
     def get_user_by_username(self, username: str):
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM customers WHERE username = ?", (username,))
-        return cursor.fetchone()
-
+        return self.db.query(Customer).filter(Customer.username == username).first()
 
     def get_user_by_phone_number(self, phone_number: str):
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM customers WHERE phone_number = ?", (phone_number,))
-        return cursor.fetchone()
-
+        return self.db.query(Customer).filter(Customer.phone_number == phone_number).first()
 
     def get_user(self, username: str | None = None, phone_number: str | None = None):
-        conditions = []
-        params = []
+        query = self.db.query(Customer)
 
         if username is not None:
-            conditions.append("username LIKE ?")
-            params.append(f"%{username}%")
+            query = query.filter(Customer.username.like(f"%{username}%"))
 
         if phone_number is not None:
-            conditions.append("phone_number LIKE ?")
-            params.append(f"%{phone_number}%")
+            query = query.filter(Customer.phone_number.like(f"%{phone_number}%"))
 
-        query = "SELECT * FROM customers"
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-
-        cursor = self.conn.cursor()
-        cursor.execute(query,params)
-        return cursor.fetchall()
+        return query.all()
