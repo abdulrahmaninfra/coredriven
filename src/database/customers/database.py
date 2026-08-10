@@ -5,11 +5,29 @@ from src.core.config import get_settings
 
 settings = get_settings()
 
+_SQLALCHEMY_DIALECTS = (
+    "sqlite",
+    "postgres",
+    "mysql",
+    "mariadb",
+    "mssql",
+    "oracle",
+    "cockroachdb",
+)
+
+
+def _resolve_database_url() -> str:
+    url = settings.DATABASE_URL
+    if url.startswith(_SQLALCHEMY_DIALECTS):
+        return url
+    return f"sqlite:///{settings.DATABASE_NAME}"
+
+
 connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 
-engine = create_engine(settings.DATABASE_URL, connect_args=connect_args)
+engine = create_engine(_resolve_database_url(), connect_args=connect_args)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
