@@ -5,7 +5,7 @@ from src.database.sessions.models import Sessions
 from src.database.customers.models import Customer
 from src.database.workstations.models import Workstation
 
-def create_session(db: Session, user_id: str, workstation_id: str):
+def start_session(db: Session, user_id: str, workstation_id: str):
     customer = db.query(Customer).filter(Customer.id == user_id).first()
     if not customer:
         raise ValueError("User not found")
