@@ -1,9 +1,9 @@
-from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Numeric, String, func
+from sqlalchemy import Boolean, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database.customers.database import Base
+
 
 class Workstation(Base):
     __tablename__ = "workstations"

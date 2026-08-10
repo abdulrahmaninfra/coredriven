@@ -9,7 +9,7 @@ connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 
-engine = create_engine(settings.DATABASE_URL, **connect_args)
+engine = create_engine(settings.DATABASE_URL, connect_args=connect_args)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
@@ -19,9 +19,9 @@ class Base(DeclarativeBase):
 
 
 def create_db():
-    from src.database.customers import models  # noqa: F401
-    from src.database.workstations import models  # noqa: F401
-    from src.database.sessions import models  # noqa: F401
+    import src.database.customers.models as customer_models  # noqa: F401
+    import src.database.sessions.models as session_models  # noqa: F401
+    import src.database.workstations.models as workstation_models  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
 
