@@ -1,33 +1,57 @@
 import uuid
+from datetime import UTC, datetime, timedelta
+
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
-from src.database.sessions.models import Sessions
+
 from src.database.customers.models import Customer
+from src.database.exceptions import (
+    InsufficientBalanceError,
+    InvalidWorkstationRateError,
+    UserAlreadyHasActiveSessionError,
+    UserDeactivatedError,
+    UserNotFoundError,
+    WorkstationDeactivatedError,
+    WorkstationIdRequiredError,
+    WorkstationNotFoundError,
+    WorkstationUnavailableError,
+)
+from src.database.sessions.models import Sessions
 from src.database.workstations.models import Workstation
+
 
 def start_session(db: Session, user_id: str, workstation_id: str):
     customer = db.query(Customer).filter(Customer.id == user_id).first()
-    if customer:
-        raise ValueError("User already has an active session")
     if not customer:
-        raise ValueError("User not found")
-    customer_balance = customer.balance
+        raise UserNotFoundError("User not found")
+    if not customer.is_active:
+        raise UserDeactivatedError("This account has been deactivated")
     if customer.balance <= 0:
-        raise ValueError("Insufficient balance")
-    
+        raise InsufficientBalanceError("Insufficient balance")
+
     if not workstation_id:
-        raise ValueError("Workstation ID is required")
+        raise WorkstationIdRequiredError("Workstation ID is required")
+
     workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
     if not workstation:
-        raise ValueError("Workstation not found")
-    workstation_hourly_rate = workstation.hourly_rate
-    if workstation_hourly_rate <= 0:
-        raise ValueError("Invalid workstation hourly rate")
+        raise WorkstationNotFoundError("Workstation not found")
+    if not workstation.is_active:
+        raise WorkstationDeactivatedError("Workstation is deactivated")
+    if workstation.status != "available":
+        raise WorkstationUnavailableError("Workstation is not available")
+    if workstation.hourly_rate <= 0:
+        raise InvalidWorkstationRateError("Invalid workstation hourly rate")
 
-    
-    start_time = datetime.now()
-    available_minutes = (customer_balance / workstation_hourly_rate) * 60
-    end_time = datetime.now() + timedelta(minutes=available_minutes)
+    active_session = (
+        db.query(Sessions)
+        .filter(Sessions.user_id == user_id, Sessions.status == "active")
+        .first()
+    )
+    if active_session:
+        raise UserAlreadyHasActiveSessionError("User already has an active session")
+
+    start_time = datetime.now(UTC)
+    available_minutes = float(customer.balance / workstation.hourly_rate) * 60
+    end_time = start_time + timedelta(minutes=available_minutes)
 
     session = Sessions(
         id=str(uuid.uuid4()),
@@ -35,10 +59,10 @@ def start_session(db: Session, user_id: str, workstation_id: str):
         workstation_id=workstation_id,
         start_time=start_time,
         end_time=end_time,
-        status="occupied",
+        status="active",
     )
     db.add(session)
+    workstation.status = "occupied"
     db.commit()
     db.refresh(session)
     return session
-        

@@ -4,12 +4,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from src.api.auth import auth as authentication_router
+from src.api.routers.auth import auth as authentication_router
 from src.core.config import get_settings
 from src.database.customers.database import create_db
 
 
-@asynccontextmanager
+@asynccontextmanager    
 async def lifespan(app: FastAPI):
     create_db()
     yield
