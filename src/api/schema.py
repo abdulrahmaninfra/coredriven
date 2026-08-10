@@ -1,3 +1,4 @@
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -28,3 +29,29 @@ class UserUpdate(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class SessionStart(BaseModel):
+    workstation_id: str
+
+
+class SessionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    workstation_id: str
+    cost: float | None
+    start_time: datetime
+    end_time: datetime | None
+    status: str
+
+
+class WorkstationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    status: str
+    hourly_rate: float
+    is_active: bool
