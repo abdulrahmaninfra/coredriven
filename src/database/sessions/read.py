@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from src.database.exceptions import SessionNotFoundError
 from src.database.sessions.models import Sessions
 
 
@@ -24,7 +25,7 @@ class GetSession:
             .first()
         )
 
-    def get_session(self, user_id: str | None = None, workstation_id: str | None = None):
+    def get_session(self, user_id: str | None = None, workstation_id: str | None = None, status: str | None = None):
         query = self.db.query(Sessions)
 
         if user_id is not None:
@@ -33,4 +34,13 @@ class GetSession:
         if workstation_id is not None:
             query = query.filter(Sessions.workstation_id == workstation_id)
 
+        if status is not None:
+            query = query.filter(Sessions.status == status)
+
         return query.all()
+
+    def get_session_by_id(self, session_id: str):
+        session = self.db.query(Sessions).filter(Sessions.id == session_id).first()
+        if session is None:
+            raise SessionNotFoundError("Session not found")
+        return session
