@@ -1,15 +1,24 @@
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from src.api.errors import app_error_handler
 from src.api.routers.auth import auth as authentication_router
+from src.api.routers.sessions import sessions as sessions_router
+from src.api.workstations import workstations as workstations_router
 from src.core.config import get_settings
 from src.database.customers.database import create_db
+from src.database.exceptions import AppError
 
 
-@asynccontextmanager    
+@asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db()
     yield
@@ -35,9 +44,22 @@ def create_auth_application() -> FastAPI:
         max_age=86400,
     )
 
+    application.add_exception_handler(AppError, app_error_handler)
+
     application.include_router(authentication_router)
+    application.include_router(sessions_router)
+    application.include_router(workstations_router)
 
     return application
 
 
 auth = create_auth_application()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    from src.core.config import get_settings
+
+    settings = get_settings()
+    uvicorn.run("src.api.main:auth", host=settings.HOST, port=settings.PORT, reload=True)
