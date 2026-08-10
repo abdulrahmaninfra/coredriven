@@ -7,11 +7,14 @@ from src.database.workstations.models import Workstation
 
 def start_session(db: Session, user_id: str, workstation_id: str):
     customer = db.query(Customer).filter(Customer.id == user_id).first()
+    if customer:
+        raise ValueError("User already has an active session")
     if not customer:
         raise ValueError("User not found")
     customer_balance = customer.balance
     if customer.balance <= 0:
         raise ValueError("Insufficient balance")
+    
     if not workstation_id:
         raise ValueError("Workstation ID is required")
     workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
@@ -20,7 +23,9 @@ def start_session(db: Session, user_id: str, workstation_id: str):
     workstation_hourly_rate = workstation.hourly_rate
     if workstation_hourly_rate <= 0:
         raise ValueError("Invalid workstation hourly rate")
+
     
+    start_time = datetime.now()
     available_minutes = (customer_balance / workstation_hourly_rate) * 60
     end_time = datetime.now() + timedelta(minutes=available_minutes)
 
@@ -28,8 +33,9 @@ def start_session(db: Session, user_id: str, workstation_id: str):
         id=str(uuid.uuid4()),
         user_id=user_id,
         workstation_id=workstation_id,
+        start_time=start_time,
         end_time=end_time,
-        status="active",
+        status="occupied",
     )
     db.add(session)
     db.commit()

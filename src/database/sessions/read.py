@@ -19,9 +19,9 @@ class GetSession:
         query = self.db.query(Sessions)
 
         if user_id is not None:
-            query = query.filter(Sessions.user_id.like(f"%{user_id}%"))
+            query = query.filter(Sessions.user_id == user_id)
 
         if workstation_id is not None:
-            query = query.filter(Sessions.workstation_id.like(f"%{workstation_id}%"))
+            query = query.filter(Sessions.workstation_id == workstation_id)
 
         return query.all()
