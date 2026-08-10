@@ -12,7 +12,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from src.api.errors import app_error_handler
 from src.api.routers.auth import auth as authentication_router
 from src.api.routers.sessions import sessions as sessions_router
-from src.api.workstations import workstations as workstations_router
+from src.api.routers.workstations import workstations as workstations_router
 from src.core.config import get_settings
 from src.database.customers.database import create_db
 from src.database.exceptions import AppError
