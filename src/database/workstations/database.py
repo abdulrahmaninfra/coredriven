@@ -19,7 +19,7 @@ class Base(DeclarativeBase):
 
 
 def create_db():
-    from src.database.customers import models  # noqa: F401
+    from src.database.workstations import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 
