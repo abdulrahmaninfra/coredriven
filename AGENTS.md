@@ -26,14 +26,17 @@ uv sync --frozen        # CI install
 
 ## Architecture
 
-- `src/api/` — FastAPI routers (`main.py` = app factory `create_auth_application()` producing the `auth` instance + middleware; `auth.py` = router; `schema.py` = pydantic models).
+- `src/api/` — FastAPI routers (`main.py` = app factory `create_auth_application()` producing the `auth` instance + middleware, wires routers and the exception handler; `routers/auth.py`, `routers/sessions.py` = routers; `workstations.py` = router; `errors.py` = `AppError` → HTTP status mapping + handler; `schema.py` = pydantic models). `main.py` has a `if __name__ == "__main__"` block that serves with uvicorn via `uv run python -m src.api.main`.
 - `src/core/` — `config.py` (settings), `security.py` (argon2 via passlib, JWT via PyJWT, `get_current_user`, `oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")`).
-- `src/database/customers/` — SQLAlchemy layer:
-  - `database.py` — `engine` (hardcoded `sqlite:///{DATABASE_NAME}`, ignores the `DATABASE_URL` setting), `SessionLocal`, `Base`, `create_db()`, and the `get_db` dependency yielding a `Session`.
-  - `models.py` — `Customer` ORM model (`customers` table, `id` = `String` PK supplied as `uuid4` by callers).
-  - `create.py` / `read.py` / `update.py` / `delete.py` — classes `CreateNewUser`, `GetUser`, `UpdateUser`, `DeleteUser`; take the `Session` and return ORM instances/booleans.
-- `create_db()` runs in the app lifespan (`Base.metadata.create_all`). New tables go on `Base` in `models.py`; schema changes are not migrated (no Alembic).
-- Auth endpoints (prefix `/auth`): `POST /register`, `POST /login` (OAuth2 form-encoded, `OAuth2PasswordRequestForm`), `PUT /update`, `DELETE /delete`, `GET /users/me` (Bearer). Docs at `docs/auth.md` and `docs/sqlalchemy-migration-plan.md`.
+- `src/database/` — SQLAlchemy layer:
+  - `customers/database.py` — `engine`, `SessionLocal`, `Base`, `create_db()`, and the `get_db` dependency yielding a `Session`. Engine URL resolved by `_resolve_database_url()`: if `DATABASE_URL` starts with a known dialect (`sqlite`, `postgres`, `mysql`, …) it is used as-is, otherwise it falls back to `sqlite:///{DATABASE_NAME}`. `connect_args["check_same_thread"] = False` only for SQLite.
+  - `customers/models.py` — `Customer` ORM model (`customers` table, `id` = `String` PK supplied as `uuid4` by callers).
+  - `customers/create.py` / `read.py` / `update.py` / `delete.py` — classes `CreateNewUser`, `GetUser`, `UpdateUser`, `DeleteUser`; take the `Session` and return ORM instances/booleans.
+  - `sessions/` — `models.py` (`Sessions` ORM model), `start.py` / `end.py` (`start_session`, `end_session`), `read.py` (`GetSession` with filters + `get_session_by_id`).
+  - `workstations/` — `models.py` (`Workstation` ORM model), `read.py` (`GetWorkstation`).
+  - `exceptions.py` — domain error hierarchy rooted at `AppError` (`UserNotFoundError`, `WorkstationUnavailableError`, `SessionNotFoundError`, `CustomerNotFoundError`, etc.); raised by the DB layer and translated to HTTP by `src/api/errors.py`.
+- `create_db()` runs in the app lifespan (`Base.metadata.create_all`). New tables go on `Base` in the relevant `models.py`; schema changes are not migrated (no Alembic).
+- Endpoints: auth (`/auth`): `POST /register`, `POST /login` (OAuth2 form-encoded, `OAuth2PasswordRequestForm`), `PUT /update`, `DELETE /delete`, `GET /users/me` (Bearer). Sessions (`/sessions`, all Bearer): `POST /sessions/start`, `POST /sessions/{session_id}/end`, `GET /sessions`, `GET /sessions/{session_id}`. Workstations (`/workstations`): `GET /workstations` (Bearer). Docs at `docs/auth.md` and `docs/sqlalchemy-migration-plan.md`.
 
 ## Conventions / CI
 
