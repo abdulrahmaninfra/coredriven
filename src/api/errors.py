@@ -6,6 +6,7 @@ from src.database.exceptions import (
     CustomerNotFoundError,
     InsufficientBalanceError,
     InvalidWorkstationRateError,
+    NotAdminError,
     NotYourSessionError,
     SessionNotActiveError,
     SessionNotFoundError,
@@ -36,6 +37,7 @@ ERROR_STATUS_MAP: dict[type[AppError], int] = {
     WorkstationUnavailableError: status.HTTP_409_CONFLICT,
     WorkstationDeactivatedError: status.HTTP_409_CONFLICT,
     SessionNotActiveError: status.HTTP_409_CONFLICT,
+    NotAdminError: status.HTTP_403_FORBIDDEN,
 }
 
 

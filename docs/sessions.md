@@ -8,7 +8,8 @@ unless `Customer.is_admin` is set, in which case staff can manage anyone's.
 ## Lifecycle
 
 ```
-POST /auth/register            create account (balance funds the session)
+POST /auth/admin/register      admin creates account (starts at balance 0)
+PUT /auth/admin/update         admin funds it: {target_username, balance}
 POST /auth/login               get JWT (login itself creates NO session)
 POST /sessions/start           {workstation_id} -> session (status "active")
 ... user occupies the workstation ...

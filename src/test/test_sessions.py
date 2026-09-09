@@ -9,28 +9,54 @@ os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
 
 from fastapi.testclient import TestClient
 
-from src.api.main import auth
+from main import app
+from src.database.customers.create import CreateNewUser
 from src.database.customers.database import SessionLocal
 from src.database.customers.read import GetUser
 from src.database.workstations.models import Workstation
 
 # NOTE: usernames / workstation names use the "sess_" prefix so they cannot
-# collide with src/test/test_auth.py rows: both modules share one database
+# collide with the other test modules: both modules share one database
 # file because get_settings() is lru_cached on first import.
+# Users are created by an admin (public registration no longer exists) and
+# topped up to a working balance the same way.
 
 
 def _register(client, username, balance=50.0):
+    admin_headers = _ensure_admin(client)
     response = client.post(
-        "/auth/register",
+        "/auth/admin/register",
         json={
             "username": username,
             "password": "secret123",
             "phone_number": f"555-{username}",
-            "balance": balance,
+            "balance": balance,  # ignored: new users start at 0 until topped up
         },
+        headers=admin_headers,
     )
     assert response.status_code == 201, response.text
+    if balance:
+        response = client.put(
+            "/auth/admin/update",
+            json={"target_username": username, "balance": balance},
+            headers=admin_headers,
+        )
+        assert response.status_code == 200, response.text
     return response.json()
+
+
+def _ensure_admin(client):
+    db = SessionLocal()
+    try:
+        if GetUser(db).get_user_by_username("sess_admin") is None:
+            CreateNewUser(
+                "sess_admin", "secret123", "555-sess_admin", 50.0
+            ).create_user(db)
+        GetUser(db).get_user_by_username("sess_admin").is_admin = True
+        db.commit()
+    finally:
+        db.close()
+    return _auth_headers(_login(client, "sess_admin"))
 
 
 def _login(client, username):
@@ -62,16 +88,6 @@ def _seed_workstation(name, hourly_rate=10.0):
         db.close()
 
 
-def _make_admin(username):
-    db = SessionLocal()
-    try:
-        user = GetUser(db).get_user_by_username(username)
-        user.is_admin = True
-        db.commit()
-    finally:
-        db.close()
-
-
 def _user_id(username):
     db = SessionLocal()
     try:
@@ -81,7 +97,7 @@ def _user_id(username):
 
 
 def test_start_and_logout_ends_session():
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         _register(client, "sess_u1")
         token = _login(client, "sess_u1")
         headers = _auth_headers(token)
@@ -119,7 +135,7 @@ def test_start_and_logout_ends_session():
 
 
 def test_cannot_end_or_read_other_users_session():
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         _register(client, "sess_u2")
         _register(client, "sess_u3")
         token2 = _login(client, "sess_u2")
@@ -165,12 +181,10 @@ def test_cannot_end_or_read_other_users_session():
 
 
 def test_admin_can_manage_other_users_sessions():
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         _register(client, "sess_u4")
-        _register(client, "sess_admin")
-        _make_admin("sess_admin")
+        admin_headers = _ensure_admin(client)
         token4 = _login(client, "sess_u4")
-        admin_headers = _auth_headers(_login(client, "sess_admin"))
         ws_id = _seed_workstation("sess-ws-3")
 
         session_id = (
@@ -195,7 +209,7 @@ def test_admin_can_manage_other_users_sessions():
 
 
 def test_double_start_conflicts_and_end_twice_conflicts():
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         _register(client, "sess_u5")
         headers = _auth_headers(_login(client, "sess_u5"))
         ws_id = _seed_workstation("sess-ws-4")
@@ -222,7 +236,7 @@ def test_double_start_conflicts_and_end_twice_conflicts():
 
 
 def test_status_filter_validation():
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         _register(client, "sess_u6")
         headers = _auth_headers(_login(client, "sess_u6"))
 
@@ -241,7 +255,7 @@ def test_negative_duration_clamps_cost_to_zero(monkeypatch):
         def now(cls, tz=None):
             return super().now(tz) - timedelta(hours=2)
 
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         _register(client, "sess_u7", balance=50.0)
         headers = _auth_headers(_login(client, "sess_u7"))
         ws_id = _seed_workstation("sess-ws-6")
@@ -265,7 +279,7 @@ def test_negative_duration_clamps_cost_to_zero(monkeypatch):
 
 
 def test_logout_requires_auth():
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         assert client.post("/auth/logout").status_code in (401, 403)
         assert client.post("/auth/logout", headers=_auth_headers("bad")).status_code in (
             401,

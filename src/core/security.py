@@ -22,10 +22,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
 
 def hash_password(plain_password: str) -> str:
     return argon2.hash(plain_password)
-       
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:  
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         return argon2.verify(plain_password, hashed_password)
     except Exception:
@@ -45,8 +45,11 @@ def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except jwt.PyJWTError as e:
-        print(f"Error decoding token: {e}")
-        return {}
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from e
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -81,4 +84,3 @@ def get_current_user(
         )
 
     return user
-

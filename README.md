@@ -15,7 +15,7 @@ billed by the hour when the session ends (or when they log out).
 ```bash
 uv sync --frozen          # install dependencies
 cp .env.example .env      # then fill in real values (see below)
-uv run uvicorn src.api.main:auth --port 9999 --reload
+uv run uvicorn main:app --port 9999 --reload
 ```
 
 Interactive docs: `http://localhost:9999/docs`
@@ -37,11 +37,14 @@ them). Key ones:
 ## How it works
 
 ```
-register → login (JWT) → POST /sessions/start {workstation_id}
+admin creates + funds account → login (JWT) → POST /sessions/start {workstation_id}
     → … use the PC … → POST /auth/logout  (ends your session, bills you)
 ```
 
 - Login is form-encoded (`username=` + `password=`), everything else is JSON.
+- Accounts are created by admins (`POST /auth/admin/register`, new users
+  start at balance 0) and funded via `PUT /auth/admin/update`.
+  Users manage only their own phone/password via `PUT /auth/update`.
 - Sessions are **self-scoped**: you can only start/end/read your own, unless
   your account has `is_admin`, in which case staff can manage anyone's.
 - Billing: `cost = elapsed_hours × workstation.hourly_rate`, clamped at zero
@@ -54,12 +57,13 @@ register → login (JWT) → POST /sessions/start {workstation_id}
 
 | Method & path | Auth | Description |
 |---|---|---|
-| `POST /auth/register` | – | Create account (`username`, `password`, `phone_number`, `balance`) |
+| `POST /auth/admin/register` | Admin | Create account (starts at balance 0) |
 | `POST /auth/login` | – | OAuth2 form login → `{access_token}` |
 | `POST /auth/logout` | Bearer | End your active session (idempotent) |
 | `GET /auth/users/me` | Bearer | Your profile |
-| `PUT /auth/update` | Bearer | Update your fields |
-| `DELETE /auth/delete` | Bearer | Delete your account |
+| `PUT /auth/update` | Bearer | Update your phone/password |
+| `PUT /auth/admin/update` | Admin | Update any user (`target_username`, balance, `is_active`, rename) |
+| `DELETE /auth/admin/delete` | Admin | Delete a user (`?username=` or `?phone_number=`) |
 | `POST /sessions/start` | Bearer | Start a session on a workstation |
 | `POST /sessions/{id}/end` | Bearer | End a session (owner or admin) |
 | `GET /sessions` | Bearer | List sessions (self-only unless admin; `?status=active\|ended`) |
@@ -74,7 +78,8 @@ uv run ruff check .        # lint (CI runs this)
 uv run python -m pytest    # tests (CI runs this)
 ```
 
-- The FastAPI app instance is named **`auth`** (`src.api.main:auth`), not `app`.
+- The FastAPI app instance is named **`app`** (`main:app` in the repo-root
+  `main.py`).
 - Tests live in `src/test/` and set their own temp database via env vars
   before importing the app.
 - Commit messages use `type:` prefixes (`feat:`, `fix:`, `test:`, `docs:`,

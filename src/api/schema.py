@@ -24,7 +24,12 @@ class UserUpdate(BaseModel):
     password: str | None = None
     balance: float | None = None
     is_active: bool | None = None
+    # Admin-only: which user to update. Defaults to the caller.
+    target_username: str | None = None
 
+class UserSelfUpdate(BaseModel):
+    phone_number: str | None = None
+    password: str | None = None
 
 class Token(BaseModel):
     access_token: str
