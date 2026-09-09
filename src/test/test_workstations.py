@@ -8,25 +8,14 @@ os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
 
 from fastapi.testclient import TestClient
 
-from src.api.main import auth
+from main import app
+from src.database.customers.create import CreateNewUser
 from src.database.customers.database import SessionLocal
 from src.database.customers.read import GetUser
 
 # NOTE: "wsu_" prefix avoids rows colliding with the other test modules:
 # get_settings() is lru_cached, so all modules share one database file.
-
-
-def _register(client, username, balance=50.0):
-    response = client.post(
-        "/auth/register",
-        json={
-            "username": username,
-            "password": "secret123",
-            "phone_number": f"555-{username}",
-            "balance": balance,
-        },
-    )
-    assert response.status_code == 201, response.text
+# Users are created by an admin (public registration no longer exists).
 
 
 def _login(client, username):
@@ -41,9 +30,13 @@ def _headers(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def _make_admin(username):
+def _seed_admin(username):
     db = SessionLocal()
     try:
+        if GetUser(db).get_user_by_username(username) is None:
+            CreateNewUser(username, "secret123", f"555-{username}", 50.0).create_user(
+                db
+            )
         GetUser(db).get_user_by_username(username).is_admin = True
         db.commit()
     finally:
@@ -51,13 +44,34 @@ def _make_admin(username):
 
 
 def _admin_headers(client, username):
-    _register(client, username)
-    _make_admin(username)
+    _seed_admin(username)
     return _headers(_login(client, username))
 
 
+def _create_user(client, admin_headers, username, balance=50.0):
+    response = client.post(
+        "/auth/admin/register",
+        json={
+            "username": username,
+            "password": "secret123",
+            "phone_number": f"555-{username}",
+            "balance": balance,  # ignored: new users start at 0 until topped up
+        },
+        headers=admin_headers,
+    )
+    assert response.status_code == 201, response.text
+    if balance:
+        response = client.put(
+            "/auth/admin/update",
+            json={"target_username": username, "balance": balance},
+            headers=admin_headers,
+        )
+        assert response.status_code == 200, response.text
+    return response.json()
+
+
 def test_admin_can_create_workstation():
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         headers = _admin_headers(client, "wsu_admin_1")
 
         response = client.post(
@@ -79,8 +93,9 @@ def test_admin_can_create_workstation():
 
 
 def test_non_admin_cannot_create_workstation():
-    with TestClient(auth) as client:
-        _register(client, "wsu_user")
+    with TestClient(app) as client:
+        admin = _admin_headers(client, "wsu_admin_0")
+        _create_user(client, admin, "wsu_user", balance=0.0)
         headers = _headers(_login(client, "wsu_user"))
 
         response = client.post(
@@ -94,7 +109,7 @@ def test_non_admin_cannot_create_workstation():
 
 
 def test_duplicate_name_conflicts():
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         headers = _admin_headers(client, "wsu_admin_2")
         payload = {"name": "wsu-ws-3", "hourly_rate": 10.0}
 
@@ -104,7 +119,7 @@ def test_duplicate_name_conflicts():
 
 
 def test_invalid_payload_rejected():
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         headers = _admin_headers(client, "wsu_admin_3")
 
         for payload in (
@@ -118,7 +133,7 @@ def test_invalid_payload_rejected():
 
 
 def test_created_workstation_can_host_session():
-    with TestClient(auth) as client:
+    with TestClient(app) as client:
         headers = _admin_headers(client, "wsu_admin_4")
         ws_id = (
             client.post(
