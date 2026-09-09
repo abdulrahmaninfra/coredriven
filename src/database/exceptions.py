@@ -63,3 +63,7 @@ class NotYourSessionError(AppError):
 
 class CustomerNotFoundError(AppError):
     pass
+
+
+class NotAdminError(AppError):
+    pass
