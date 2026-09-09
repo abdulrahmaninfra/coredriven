@@ -29,6 +29,14 @@ class WorkstationNotFoundError(AppError):
     pass
 
 
+class WorkstationNameRequiredError(AppError):
+    pass
+
+
+class WorkstationNameTakenError(AppError):
+    pass
+
+
 class WorkstationDeactivatedError(AppError):
     pass
 
@@ -46,6 +54,10 @@ class SessionNotFoundError(AppError):
 
 
 class SessionNotActiveError(AppError):
+    pass
+
+
+class NotYourSessionError(AppError):
     pass
 
 
