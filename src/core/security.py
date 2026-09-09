@@ -19,10 +19,8 @@ ALGORITHM = settings.JWT_ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
 
 
-
 def hash_password(plain_password: str) -> str:
     return argon2.hash(plain_password)
-
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
