@@ -13,4 +13,3 @@ class Workstation(Base):
     status: Mapped[str] = mapped_column(String(20), default="available")
     hourly_rate: Mapped[float] = mapped_column(Numeric(5, 2), default=0.0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    
