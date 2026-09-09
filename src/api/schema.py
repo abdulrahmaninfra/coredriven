@@ -55,3 +55,9 @@ class WorkstationResponse(BaseModel):
     status: str
     hourly_rate: float
     is_active: bool
+
+
+class WorkstationCreate(BaseModel):
+    name: str
+    hourly_rate: float = 0.0
+    is_active: bool = True
