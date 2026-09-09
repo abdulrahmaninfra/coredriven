@@ -5,7 +5,14 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from src.api.schema import SessionResponse, Token, UserCreate, UserResponse, UserUpdate
+from src.api.schema import (
+    SessionResponse,
+    Token,
+    UserCreate,
+    UserResponse,
+    UserSelfUpdate,
+    UserUpdate,
+)
 from src.core.security import create_access_token, get_current_user, verify_password
 from src.database.customers.create import CreateNewUser
 from src.database.customers.database import get_db
@@ -13,16 +20,28 @@ from src.database.customers.delete import DeleteUser
 from src.database.customers.models import Customer
 from src.database.customers.read import GetUser
 from src.database.customers.update import UpdateUser
+from src.database.exceptions import NotAdminError, UserNotFoundError
 from src.database.sessions.end import end_session
 from src.database.sessions.read import GetSession
 
 logger = logging.getLogger(__name__)
 
 auth = APIRouter(prefix="/auth", tags=["Authentication"])
+admin = APIRouter(prefix="/auth/admin", tags=["Authentication"])
 
 
-@auth.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+@admin.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
+def register(
+    user_data: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: Customer = Depends(get_current_user),
+):
+
+    if not current_user.is_admin:
+        raise NotAdminError("Only admins can register new users.")
+
     existing = GetUser(db).get_user_by_username(user_data.username)
     if existing:
         raise HTTPException(
@@ -35,7 +54,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
             username=user_data.username,
             password=user_data.password,
             phone_number=user_data.phone_number,
-            balance=user_data.balance,
+            balance=0.0,
         ).create_user(db)
 
         if new_user is None:
@@ -79,12 +98,41 @@ def login(
 
 
 @auth.put("/update", response_model=UserResponse)
+def update_self(
+    user_data: UserSelfUpdate,
+    db: Session = Depends(get_db),
+    current_user: Customer = Depends(get_current_user),
+):
+    updated = UpdateUser(
+        db,
+        current_username=current_user.username,
+        phone_number=user_data.phone_number,
+        password=user_data.password,
+    )
+
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid fields provided to update.",
+        )
+
+    return GetUser(db).get_user_by_username(current_user.username)
+
+
+@admin.put("/update", response_model=UserResponse)
 def update_user(
     user_data: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: Customer = Depends(get_current_user)
+    current_user: Customer = Depends(get_current_user),
 ):
-    if user_data.username is not None and user_data.username != current_user.username:
+    if not current_user.is_admin:
+        raise NotAdminError("Only admins can update user information.")
+
+    target = user_data.target_username or current_user.username
+    if GetUser(db).get_user_by_username(target) is None:
+        raise UserNotFoundError(f"User '{target}' not found.")
+
+    if user_data.username is not None and user_data.username != target:
         existing = GetUser(db).get_user_by_username(user_data.username)
         if existing:
             raise HTTPException(
@@ -94,7 +142,7 @@ def update_user(
 
     updated = UpdateUser(
         db,
-        current_username=current_user.username,
+        current_username=target,
         username=user_data.username,
         phone_number=user_data.phone_number,
         password=user_data.password,
@@ -108,25 +156,39 @@ def update_user(
             detail="No fields to update.",
         )
 
-    username = user_data.username or current_user.username
+    username = user_data.username or target
     return GetUser(db).get_user_by_username(username)
 
-@auth.delete("/delete")
-def delete_user(username: str | None = None, phone_number: str | None = None, db: Session = Depends(get_db),current_user: Customer = Depends(get_current_user)):
 
-    if username and username != current_user.username:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="you are not authorized to delete this user")
+@admin.delete("/delete")
+def delete_user(
+    username: str | None = None,
+    phone_number: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: Customer = Depends(get_current_user),
+):
 
+    if not current_user.is_admin:
+        raise NotAdminError("Only admins can delete users.")
 
-    deleted = DeleteUser(username=username , phone_number=phone_number, db=db)
+    deleter = DeleteUser(username=username, phone_number=phone_number, db=db)
+    if username:
+        deleted = deleter.delete_by_username()
+    elif phone_number:
+        deleted = deleter.delete_by_phone_number()
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="username or phone_number is required.",
+        )
 
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
 
-
-@auth.get("/users/me", response_model=UserResponse)
-def read_users_me(current_user: Customer = Depends(get_current_user)):
-    return current_user
+    return {"detail": "User deleted."}
 
 
 @auth.post("/logout")
@@ -134,14 +196,6 @@ def logout(
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_user),
 ):
-    """End the caller's active session, if any.
-
-    Idempotent: logging out twice (or with no active session) returns
-    ``ended: False`` instead of an error. The lookup is keyed on
-    ``current_user.id``, so a user can only ever end their own session
-    through this path. Callers must discard the JWT client-side; the token
-    itself remains valid until expiry.
-    """
     active = GetSession(db).get_session_by_user_id(current_user.id)
     if active is None:
         return {"detail": "No active session.", "ended": False, "session": None}
@@ -151,3 +205,8 @@ def logout(
         "ended": True,
         "session": SessionResponse.model_validate(ended),
     }
+
+
+@auth.get("/users/me", response_model=UserResponse)
+def read_users_me(current_user: Customer = Depends(get_current_user)):
+    return current_user
