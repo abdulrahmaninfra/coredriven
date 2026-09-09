@@ -70,6 +70,8 @@ admin creates + funds account → login (JWT) → POST /sessions/start {workstat
 | `GET /sessions/{id}` | Bearer | One session (owner or admin) |
 | `GET /workstations` | Bearer | List workstations |
 | `POST /workstations` | Admin | Create a workstation |
+| `PUT /workstations?name=` | Admin | Update name/rate/`is_active` (`status` is session-managed, not editable) |
+| `DELETE /workstations?name=` | Admin | Delete; force-ends and bills any active session |
 
 ## Development
 
