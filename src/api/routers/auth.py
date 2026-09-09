@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from src.api.schema import Token, UserCreate, UserResponse, UserUpdate
+from src.api.schema import SessionResponse, Token, UserCreate, UserResponse, UserUpdate
 from src.core.security import create_access_token, get_current_user, verify_password
 from src.database.customers.create import CreateNewUser
 from src.database.customers.database import get_db
@@ -13,6 +13,8 @@ from src.database.customers.delete import DeleteUser
 from src.database.customers.models import Customer
 from src.database.customers.read import GetUser
 from src.database.customers.update import UpdateUser
+from src.database.sessions.end import end_session
+from src.database.sessions.read import GetSession
 
 logger = logging.getLogger(__name__)
 
@@ -125,3 +127,27 @@ def delete_user(username: str | None = None, phone_number: str | None = None, db
 @auth.get("/users/me", response_model=UserResponse)
 def read_users_me(current_user: Customer = Depends(get_current_user)):
     return current_user
+
+
+@auth.post("/logout")
+def logout(
+    db: Session = Depends(get_db),
+    current_user: Customer = Depends(get_current_user),
+):
+    """End the caller's active session, if any.
+
+    Idempotent: logging out twice (or with no active session) returns
+    ``ended: False`` instead of an error. The lookup is keyed on
+    ``current_user.id``, so a user can only ever end their own session
+    through this path. Callers must discard the JWT client-side; the token
+    itself remains valid until expiry.
+    """
+    active = GetSession(db).get_session_by_user_id(current_user.id)
+    if active is None:
+        return {"detail": "No active session.", "ended": False, "session": None}
+    ended = end_session(db, active.id, acted_by=current_user)
+    return {
+        "detail": "Logged out.",
+        "ended": True,
+        "session": SessionResponse.model_validate(ended),
+    }
