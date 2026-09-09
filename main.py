@@ -3,13 +3,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 if __name__ == "__main__":
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[0]))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from src.api.errors import app_error_handler
+from src.api.routers.auth import admin as auth_admin_router
 from src.api.routers.auth import auth as authentication_router
 from src.api.routers.sessions import sessions as sessions_router
 from src.api.routers.workstations import workstations as workstations_router
@@ -24,7 +25,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-def create_auth_application() -> FastAPI:
+def create_application() -> FastAPI:
     settings = get_settings()
 
     application = FastAPI(
@@ -49,11 +50,12 @@ def create_auth_application() -> FastAPI:
     application.include_router(authentication_router)
     application.include_router(sessions_router)
     application.include_router(workstations_router)
+    application.include_router(auth_admin_router)
 
     return application
 
 
-auth = create_auth_application()
+app = create_application()
 
 
 if __name__ == "__main__":
@@ -62,4 +64,6 @@ if __name__ == "__main__":
     from src.core.config import get_settings
 
     settings = get_settings()
-    uvicorn.run("src.api.main:auth", host=settings.HOST, port=settings.PORT, reload=True)
+    uvicorn.run(
+        "main:app", host=settings.HOST, port=settings.PORT, reload=True
+    )
