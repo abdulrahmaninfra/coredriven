@@ -12,3 +12,6 @@ class GetWorkstation:
 
     def get_by_id(self, workstation_id: str):
         return self.db.query(Workstation).filter(Workstation.id == workstation_id).first()
+
+    def get_by_name(self, name: str):
+        return self.db.query(Workstation).filter(Workstation.name == name).first()
