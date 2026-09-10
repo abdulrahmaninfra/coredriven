@@ -14,6 +14,7 @@ from src.api.routers.auth import admin as auth_admin_router
 from src.api.routers.auth import auth as authentication_router
 from src.api.routers.charge import charge as charge_router
 from src.api.routers.sessions import sessions as sessions_router
+from src.api.routers.transactions import transactions as transactions_router
 from src.api.routers.workstations import workstations as workstations_router
 from src.core.config import get_settings
 from src.database.customers.database import create_db
@@ -53,7 +54,7 @@ def create_application() -> FastAPI:
     application.include_router(workstations_router)
     application.include_router(auth_admin_router)
     application.include_router(charge_router)
-
+    application.include_router(transactions_router)
     return application
 
 

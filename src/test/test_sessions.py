@@ -2,7 +2,9 @@ import os
 import tempfile
 from datetime import datetime, timedelta
 
-os.environ["DATABASE_NAME"] = os.path.join(tempfile.mkdtemp(), "test.db")
+_tmp_db = os.path.join(tempfile.mkdtemp(), "test.db")
+os.environ["DATABASE_NAME"] = _tmp_db
+os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db}"
 os.environ["PASSWORD_HASH_SECRET_KEY"] = "test-secret-key-that-is-longer-than-32-bytes"
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"

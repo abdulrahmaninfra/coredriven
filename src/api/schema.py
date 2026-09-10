@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserCreate(BaseModel):
@@ -24,6 +24,7 @@ class UserUpdate(BaseModel):
     password: str | None = None
     balance: float | None = None
     is_active: bool | None = None
+    # Admin-only: which user to update. Defaults to the caller.
     target_username: str | None = None
 
 
@@ -78,3 +79,46 @@ class WorkstationUpdate(BaseModel):
     name: str | None = None
     hourly_rate: float | None = None
     is_active: bool | None = None
+
+
+class TransactionResponse(BaseModel):
+    """Raw ledger row as stored in the transactions table."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    amount: float
+    balance_after: float
+    note: str | None
+    created_at: datetime
+
+
+class TransactionMove(BaseModel):
+    """Body for the cash-counter operations (admin-only endpoints)."""
+
+    # Cash moves always target a customer account.
+    target_username: str
+    # Zero, negative, or non-finite amounts are rejected (422) by Pydantic
+    # before they reach the database layer.
+    amount: float = Field(gt=0)
+    note: str | None = None
+
+
+class TransactionResult(BaseModel):
+    """Recharge/deduct answer: the ledger row plus the new balance."""
+
+    transaction: TransactionResponse
+    username: str
+    new_balance: float
+
+
+class TransactionListItem(BaseModel):
+    """Ledger entry as shown in history views (username resolved)."""
+
+    id: str
+    username: str
+    amount: float
+    balance_after: float
+    note: str | None
+    created_at: datetime
