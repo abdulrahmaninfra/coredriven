@@ -8,7 +8,7 @@ if __name__ == "__main__":
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-
+from src.api.routers.transactions import transactions as transactions_router
 from src.api.errors import app_error_handler
 from src.api.routers.auth import admin as auth_admin_router
 from src.api.routers.auth import auth as authentication_router
@@ -51,7 +51,7 @@ def create_application() -> FastAPI:
     application.include_router(sessions_router)
     application.include_router(workstations_router)
     application.include_router(auth_admin_router)
-
+    application.include_router(transactions_router)
     return application
 
 
