@@ -30,7 +30,7 @@ from src.database.transactions.models import Transactions
 # NOTE: names use the "txn_" prefix so they cannot collide with the other
 # test modules sharing one database file (get_settings() is lru_cached).
 
-BASE = "/auth/admin/transactions"
+BASE = "/transactions"
 
 
 def _ensure_admin(client):
@@ -53,7 +53,7 @@ def _login(client, username, password="secret123"):
 
 def _register(client, admin_headers, username):
     response = client.post(
-        "/auth/admin/register",
+        "/users",
         json={"username": username, "password": "secret123", "phone_number": f"555-{username}"},
         headers=admin_headers,
     )
@@ -62,28 +62,21 @@ def _register(client, admin_headers, username):
 
 
 def _recharge(client, admin_headers, username, amount, note=None):
-    return client.post(
-        f"{BASE}/recharge",
-        json={"target_username": username, "amount": amount, "note": note},
-        headers=admin_headers,
-    )
+    payload = {"target_username": username, "amount": amount}
+    if note is not None:
+        payload["note"] = note
+    return client.post(f"{BASE}/recharge", json=payload, headers=admin_headers)
 
 
 def _deduct(client, admin_headers, username, amount, note=None):
-    return client.post(
-        f"{BASE}/deduct",
-        json={"target_username": username, "amount": amount, "note": note},
-        headers=admin_headers,
-    )
+    payload = {"target_username": username, "amount": amount}
+    if note is not None:
+        payload["note"] = note
+    return client.post(f"{BASE}/deduct", json=payload, headers=admin_headers)
 
 
 def _balance_of(client, username, password="secret123"):
-    return client.get("/auth/users/me", headers=_login(client, username, password)).json()["balance"]
-
-
-def _user_id_of(username):
-    with SessionLocal() as db:
-        return GetUser(db).get_user_by_username(username).id
+    return client.get("/auth/me", headers=_login(client, username, password)).json()["balance"]
 
 
 def test_recharge_adds_balance_and_writes_ledger():
@@ -100,7 +93,7 @@ def test_recharge_adds_balance_and_writes_ledger():
         assert body["transaction"]["balance_after"] == 50.25
         assert body["transaction"]["note"] == "cash at counter"
 
-        # The balance is real: the customer sees it on /auth/users/me.
+        # The balance is real: the customer sees it on /auth/me.
         assert _balance_of(client, "txn_alice") == 50.25
 
         # Second recharge stacks on top of the first.
@@ -195,14 +188,13 @@ def test_ledger_admin_only_scoping():
         # Anonymous -> 401
         assert client.get(BASE).status_code == 401
 
-        # The per-user endpoint returns only that user's rows.
-        dan_id = _user_id_of("txn_dan")
-        dan_rows = client.get(f"{BASE}/{dan_id}", headers=admin).json()
+        # The per-user filter returns only that user's rows.
+        dan_rows = client.get(f"{BASE}?username=txn_dan", headers=admin).json()
         assert all(row["username"] == "txn_dan" for row in dan_rows)
         assert any(row["amount"] == 10.0 for row in dan_rows)
 
-        # Unknown user id -> empty list, not an error.
-        assert client.get(f"{BASE}/no-such-id", headers=admin).json() == []
+        # Unknown username -> empty list, not an error.
+        assert client.get(f"{BASE}?username=no-such-user", headers=admin).json() == []
 
 
 def test_recharge_enables_session_start():
@@ -221,11 +213,11 @@ def test_recharge_enables_session_start():
 
         # Zero balance: login on the machine is refused.
         frank = _login(client, "txn_frank")
-        response = client.post("/sessions/start", json={"workstation_id": workstation_id}, headers=frank)
+        response = client.post("/sessions", json={"workstation_id": workstation_id}, headers=frank)
         assert response.status_code == 400, response.text
 
         # Cash counter fixes it: recharge, then the session starts.
         assert _recharge(client, admin, "txn_frank", 20.0).status_code == 201
-        response = client.post("/sessions/start", json={"workstation_id": workstation_id}, headers=frank)
+        response = client.post("/sessions", json={"workstation_id": workstation_id}, headers=frank)
         assert response.status_code == 201, response.text
         assert response.json()["status"] == "active"
