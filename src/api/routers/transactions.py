@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Query, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from src.api.schema import (
@@ -15,7 +17,7 @@ from src.database.transactions.create import deduct, recharge
 from src.database.transactions.models import Transactions
 from src.database.transactions.read import GetTransactions
 
-transactions = APIRouter(prefix="/auth/admin/transactions", tags=["Transactions"])
+transactions = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 
 def _require_admin(current_user: Customer) -> None:
@@ -23,10 +25,7 @@ def _require_admin(current_user: Customer) -> None:
         raise NotAdminError("Only admins can manage transactions.")
 
 
-def _with_usernames(
-    db: Session, rows: list[Transactions]
-) -> list[TransactionListItem]:
-    # Resolve user ids to usernames in one query so the ledger is readable.
+def _with_usernames(db: Session, rows: list[Transactions]) -> list[TransactionListItem]:
     ids = {row.user_id for row in rows}
     names: dict[str, str] = {}
     if ids:
@@ -81,23 +80,13 @@ def deduct_balance(
 
 @transactions.get("", response_model=list[TransactionListItem])
 def list_transactions(
-    user_id: str | None = None,
+    username: str | None = None,
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_user),
 ):
     _require_admin(current_user)
+
     query = GetTransactions(db)
-    rows = query.for_user(user_id) if user_id else query.all()
+    rows = query.for_user(username) if username else query.all()
     return _with_usernames(db, rows[:limit])
-
-
-@transactions.get("/{user_id}", response_model=list[TransactionListItem])
-def get_user_transactions(
-    user_id: str,
-    limit: int = Query(default=100, ge=1, le=500),
-    db: Session = Depends(get_db),
-    current_user: Customer = Depends(get_current_user),
-):
-    _require_admin(current_user)
-    return _with_usernames(db, GetTransactions(db).for_user(user_id)[:limit])

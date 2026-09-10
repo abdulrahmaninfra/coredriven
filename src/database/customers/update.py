@@ -7,12 +7,13 @@ from src.database.customers.models import Customer
 
 def UpdateUser(
     db: Session,
-    current_username: str,
+    current_username: str | None = None,
     username: str | None = None,
     phone_number: str | None = None,
     password: str | None = None,
     balance: float | None = None,
     is_active: bool | None = None,
+    user_id: str | None = None,
 ):
     values = {}
 
@@ -36,11 +37,15 @@ def UpdateUser(
         return False
 
     try:
-        result = (
-            db.query(Customer)
-            .filter(Customer.username == current_username)
-            .update(values)
-        )
+        query = db.query(Customer)
+        if user_id is not None:
+            query = query.filter(Customer.id == user_id)
+        elif current_username is not None:
+            query = query.filter(Customer.username == current_username)
+        else:
+            print("No user identifier provided")
+            return False
+        result = query.update(values)
         db.commit()
         return result > 0
 

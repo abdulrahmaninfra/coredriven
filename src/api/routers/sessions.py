@@ -15,7 +15,7 @@ sessions = APIRouter(prefix="/sessions", tags=["Sessions"])
 VALID_STATUSES = ("active", "ended")
 
 
-@sessions.post("/start", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
+@sessions.post("", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
 def start(
     payload: SessionStart,
     db: Session = Depends(get_db),

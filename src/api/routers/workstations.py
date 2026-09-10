@@ -5,7 +5,7 @@ from src.api.schema import WorkstationCreate, WorkstationResponse, WorkstationUp
 from src.core.security import get_current_user
 from src.database.customers.database import get_db
 from src.database.customers.models import Customer
-from src.database.exceptions import WorkstationNameRequiredError
+from src.database.exceptions import WorkstationIdRequiredError
 from src.database.workstations.create import CreateWorkstation
 from src.database.workstations.delete import DeleteWorkstation
 from src.database.workstations.read import GetWorkstation
@@ -46,19 +46,23 @@ def _require_admin(current_user: Customer):
         )
 
 
-@workstations.put("", response_model=WorkstationResponse)
+@workstations.put(
+    "/{workstation_id}",
+    response_model=WorkstationResponse,
+    summary="Update workstation by ID",
+)
 def update_workstation_endpoint(
+    workstation_id: str,
     payload: WorkstationUpdate,
-    name: str | None = None,
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_user),
 ):
     _require_admin(current_user)
-    if not name or not name.strip():
-        raise WorkstationNameRequiredError("Workstation name is required.")
+    if not workstation_id or not workstation_id.strip():
+        raise WorkstationIdRequiredError("Workstation ID is required.")
     updated = update_workstation(
         db,
-        current_name=name.strip(),
+        workstation_id=workstation_id.strip(),
         name=payload.name,
         hourly_rate=payload.hourly_rate,
         is_active=payload.is_active,
@@ -71,19 +75,20 @@ def update_workstation_endpoint(
     return updated
 
 
-@workstations.delete("")
+@workstations.delete("/{workstation_id}", summary="Delete workstation by ID")
 def delete_workstation(
-    name: str | None = None,
+    workstation_id: str,
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_user),
 ):
     _require_admin(current_user)
-    if not name or not name.strip():
-        raise WorkstationNameRequiredError("Workstation name is required.")
-    ended_session_id = (
-        DeleteWorkstation(db).delete_by_name(name.strip(), acted_by=current_user)
+    if not workstation_id or not workstation_id.strip():
+        raise WorkstationIdRequiredError("Workstation ID is required.")
+    workstation_id = workstation_id.strip()
+    ended_session_id = DeleteWorkstation(db).delete_by_id(
+        workstation_id, acted_by=current_user
     )
     return {
-        "detail": f"Workstation '{name.strip()}' deleted.",
+        "detail": f"Workstation '{workstation_id}' deleted.",
         "ended_session_id": ended_session_id,
     }
