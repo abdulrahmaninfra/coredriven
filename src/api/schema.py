@@ -67,11 +67,11 @@ class WorkstationCreate(BaseModel):
     hourly_rate: float = 0.0
     is_active: bool = True
 
-
 class WorkstationUpdate(BaseModel):
     name: str | None = None
     hourly_rate: float | None = None
     is_active: bool | None = None
+
 
 class TransactionMove(BaseModel):
     """Body for the cash-counter operations (admin-only endpoints)."""
@@ -82,17 +82,6 @@ class TransactionMove(BaseModel):
     # before they reach the database layer.
     amount: float = Field(gt=0)
     note: str | None = None
-
-
-class TransactionResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    user_id: str
-    amount: float
-    balance_after: float
-    note: str | None
-    created_at: datetime
 
 
 class TransactionResult(BaseModel):
