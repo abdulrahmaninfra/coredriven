@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+
 
 class UserCreate(BaseModel):
     username: str
