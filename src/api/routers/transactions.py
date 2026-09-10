@@ -1,47 +1,85 @@
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from src.api.schema import TransactionCreate, TransactionResponse
+from src.api.schema import (
+    TransactionListItem,
+    TransactionMove,
+    TransactionResponse,
+    TransactionResult,
+)
 from src.core.security import get_current_user
 from src.database.customers.database import get_db
 from src.database.customers.models import Customer
 from src.database.exceptions import NotAdminError
 from src.database.transactions.create import deduct, recharge
+from src.database.transactions.models import Transactions
 from src.database.transactions.read import GetTransactions
 
 transactions = APIRouter(prefix="/auth/admin/transactions", tags=["Transactions"])
 
 
-def _require_admin(current_user: Customer):
+def _require_admin(current_user: Customer) -> None:
     if not current_user.is_admin:
         raise NotAdminError("Only admins can manage transactions.")
 
 
+def _with_usernames(
+    db: Session, rows: list[Transactions]
+) -> list[TransactionListItem]:
+    # Resolve user ids to usernames in one query so the ledger is readable.
+    ids = {row.user_id for row in rows}
+    names: dict[str, str] = {}
+    if ids:
+        for user in db.query(Customer).filter(Customer.id.in_(ids)).all():
+            names[user.id] = user.username
+    return [
+        TransactionListItem(
+            id=row.id,
+            username=names.get(row.user_id, row.user_id),
+            amount=float(row.amount),
+            balance_after=float(row.balance_after),
+            note=row.note,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+
+
 @transactions.post(
-    "/recharge", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED
+    "/recharge", response_model=TransactionResult, status_code=status.HTTP_201_CREATED
 )
 def recharge_balance(
-    payload: TransactionCreate,
+    payload: TransactionMove,
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_user),
 ):
     _require_admin(current_user)
-    return recharge(db, payload.username, payload.amount, payload.note)
+    row = recharge(db, payload.target_username, payload.amount, payload.note)
+    return TransactionResult(
+        transaction=TransactionResponse.model_validate(row),
+        username=payload.target_username,
+        new_balance=float(row.balance_after),
+    )
 
 
 @transactions.post(
-    "/deduct", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED
+    "/deduct", response_model=TransactionResult, status_code=status.HTTP_201_CREATED
 )
 def deduct_balance(
-    payload: TransactionCreate,
+    payload: TransactionMove,
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_user),
 ):
     _require_admin(current_user)
-    return deduct(db, payload.username, payload.amount, payload.note)
+    row = deduct(db, payload.target_username, payload.amount, payload.note)
+    return TransactionResult(
+        transaction=TransactionResponse.model_validate(row),
+        username=payload.target_username,
+        new_balance=float(row.balance_after),
+    )
 
 
-@transactions.get("", response_model=list[TransactionResponse])
+@transactions.get("", response_model=list[TransactionListItem])
 def list_transactions(
     user_id: str | None = None,
     limit: int = Query(default=100, ge=1, le=500),
@@ -50,12 +88,11 @@ def list_transactions(
 ):
     _require_admin(current_user)
     query = GetTransactions(db)
-    if user_id:
-        return query.for_user(user_id)[:limit]
-    return query.all()[:limit]
+    rows = query.for_user(user_id) if user_id else query.all()
+    return _with_usernames(db, rows[:limit])
 
 
-@transactions.get("/{user_id}", response_model=list[TransactionResponse])
+@transactions.get("/{user_id}", response_model=list[TransactionListItem])
 def get_user_transactions(
     user_id: str,
     limit: int = Query(default=100, ge=1, le=500),
@@ -63,4 +100,4 @@ def get_user_transactions(
     current_user: Customer = Depends(get_current_user),
 ):
     _require_admin(current_user)
-    return GetTransactions(db).for_user(user_id)[:limit]
+    return _with_usernames(db, GetTransactions(db).for_user(user_id)[:limit])

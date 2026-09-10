@@ -1,5 +1,5 @@
 from datetime import datetime
-
+from src.database.transactions.models import Transactions
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -72,6 +72,17 @@ class WorkstationUpdate(BaseModel):
     hourly_rate: float | None = None
     is_active: bool | None = None
 
+class TransactionResponse(BaseModel):
+    """Raw ledger row as stored in the transactions table."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    amount: float
+    balance_after: float
+    note: str | None
+    created_at: datetime
 
 class TransactionMove(BaseModel):
     """Body for the cash-counter operations (admin-only endpoints)."""
