@@ -66,3 +66,9 @@ class WorkstationCreate(BaseModel):
     name: str
     hourly_rate: float = 0.0
     is_active: bool = True
+
+
+class WorkstationUpdate(BaseModel):
+    name: str | None = None
+    hourly_rate: float | None = None
+    is_active: bool | None = None

@@ -74,6 +74,14 @@ Computed in `end_session` (`src/database/sessions/end.py`):
   Logic lives in `CreateWorkstation` (`src/database/workstations/create.py`),
   mirroring `CreateNewUser`, with an `IntegrityError` catch so concurrent
   creates of the same name still resolve to **409**.
+- `PUT /workstations?name=pc-01` (admin only) updates `name` / `hourly_rate` /
+  `is_active` (`update_workstation`, returns the updated row). `status` is
+  deliberately not editable — it belongs to the session lifecycle. Same
+  400/404/409 rules as create; empty changes -> **400**.
+- `DELETE /workstations?name=pc-01` (admin only) removes it
+  (`DeleteWorkstation`). Missing -> **404**, blank -> **400**. If a session
+  is active on it, the session is ended and billed first (force-delete) and
+  the response reports `ended_session_id`.
 
 ## Query validation
 
