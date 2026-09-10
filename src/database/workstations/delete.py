@@ -26,3 +26,19 @@ class DeleteWorkstation:
         self.db.delete(workstation)
         self.db.commit()
         return ended_session_id
+
+    def delete_by_id(self, workstation_id: str, acted_by: Customer) -> str | None:
+
+        workstation = GetWorkstation(self.db).get_by_identifier(workstation_id)
+        if workstation is None:
+            raise WorkstationNotFoundError(f"Workstation '{workstation_id}' not found.")
+
+        active = GetSession(self.db).get_session_by_workstation_id(workstation.id)
+        ended_session_id = None
+        if active is not None:
+            ended = end_session(self.db, active.id, acted_by=acted_by)
+            ended_session_id = ended.id
+
+        self.db.delete(workstation)
+        self.db.commit()
+        return ended_session_id

@@ -11,15 +11,15 @@ from src.database.workstations.read import GetWorkstation
 
 def update_workstation(
     db: Session,
-    current_name: str,
+    workstation_id: str,
     name: str | None = None,
     hourly_rate: float | None = None,
     is_active: bool | None = None,
 ):
 
-    workstation = GetWorkstation(db).get_by_name(current_name)
+    workstation = GetWorkstation(db).get_by_identifier(workstation_id)
     if workstation is None:
-        raise WorkstationNotFoundError(f"Workstation '{current_name}' not found.")
+        raise WorkstationNotFoundError(f"Workstation '{workstation_id}' not found.")
 
     values = {}
 

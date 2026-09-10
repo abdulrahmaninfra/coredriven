@@ -2,7 +2,9 @@ import os
 import tempfile
 from datetime import datetime, timedelta
 
-os.environ["DATABASE_NAME"] = os.path.join(tempfile.mkdtemp(), "test.db")
+_tmp_db = os.path.join(tempfile.mkdtemp(), "test.db")
+os.environ["DATABASE_NAME"] = _tmp_db
+os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db}"
 os.environ["PASSWORD_HASH_SECRET_KEY"] = "test-secret-key-that-is-longer-than-32-bytes"
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
@@ -25,7 +27,7 @@ from src.database.workstations.models import Workstation
 def _register(client, username, balance=50.0):
     admin_headers = _ensure_admin(client)
     response = client.post(
-        "/auth/admin/register",
+        "/users",
         json={
             "username": username,
             "password": "secret123",
@@ -37,8 +39,8 @@ def _register(client, username, balance=50.0):
     assert response.status_code == 201, response.text
     if balance:
         response = client.put(
-            "/auth/admin/update",
-            json={"target_username": username, "balance": balance},
+            f"/users/{username}",
+            json={"balance": balance},
             headers=admin_headers,
         )
         assert response.status_code == 200, response.text
@@ -104,7 +106,7 @@ def test_start_and_logout_ends_session():
         ws_id = _seed_workstation("sess-ws-1")
 
         response = client.post(
-            "/sessions/start", json={"workstation_id": ws_id}, headers=headers
+            "/sessions", json={"workstation_id": ws_id}, headers=headers
         )
         assert response.status_code == 201, response.text
         assert response.json()["status"] == "active"
@@ -124,7 +126,7 @@ def test_start_and_logout_ends_session():
         by_id = {ws["id"]: ws for ws in response.json()}
         assert by_id[ws_id]["status"] == "available"
 
-        response = client.get("/auth/users/me", headers=headers)
+        response = client.get("/auth/me", headers=headers)
         assert response.status_code == 200
         assert response.json()["balance"] >= 0
 
@@ -144,7 +146,7 @@ def test_cannot_end_or_read_other_users_session():
 
         session_id = (
             client.post(
-                "/sessions/start",
+                "/sessions",
                 json={"workstation_id": ws_id},
                 headers=_auth_headers(token2),
             )
@@ -189,7 +191,7 @@ def test_admin_can_manage_other_users_sessions():
 
         session_id = (
             client.post(
-                "/sessions/start",
+                "/sessions",
                 json={"workstation_id": ws_id},
                 headers=_auth_headers(token4),
             )
@@ -217,13 +219,13 @@ def test_double_start_conflicts_and_end_twice_conflicts():
 
         session_id = (
             client.post(
-                "/sessions/start", json={"workstation_id": ws_id}, headers=headers
+                "/sessions", json={"workstation_id": ws_id}, headers=headers
             )
             .json()["id"]
         )
 
         response = client.post(
-            "/sessions/start", json={"workstation_id": ws_id2}, headers=headers
+            "/sessions", json={"workstation_id": ws_id2}, headers=headers
         )
         assert response.status_code == 409, response.text
 
@@ -262,7 +264,7 @@ def test_negative_duration_clamps_cost_to_zero(monkeypatch):
 
         session_id = (
             client.post(
-                "/sessions/start", json={"workstation_id": ws_id}, headers=headers
+                "/sessions", json={"workstation_id": ws_id}, headers=headers
             )
             .json()["id"]
         )
@@ -274,7 +276,7 @@ def test_negative_duration_clamps_cost_to_zero(monkeypatch):
         assert response.status_code == 200, response.text
         assert response.json()["cost"] == 0
 
-        response = client.get("/auth/users/me", headers=headers)
+        response = client.get("/auth/me", headers=headers)
         assert response.json()["balance"] == 50.0
 
 

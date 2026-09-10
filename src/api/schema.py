@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserCreate(BaseModel):
@@ -13,6 +13,7 @@ class UserCreate(BaseModel):
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: str
     username: str
     phone_number: str
     balance: float
@@ -24,12 +25,17 @@ class UserUpdate(BaseModel):
     password: str | None = None
     balance: float | None = None
     is_active: bool | None = None
-    # Admin-only: which user to update. Defaults to the caller.
-    target_username: str | None = None
+
 
 class UserSelfUpdate(BaseModel):
     phone_number: str | None = None
     password: str | None = None
+
+
+class UserCharge(BaseModel):
+    target_username: str | None = None
+    amount: float
+
 
 class Token(BaseModel):
     access_token: str
@@ -72,3 +78,35 @@ class WorkstationUpdate(BaseModel):
     name: str | None = None
     hourly_rate: float | None = None
     is_active: bool | None = None
+
+
+class TransactionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    amount: float
+    balance_after: float
+    note: str = "null"
+    created_at: datetime
+
+
+class TransactionMove(BaseModel):
+    target_username: str
+    amount: float = Field(gt=0)
+    note: str = "null"
+
+
+class TransactionResult(BaseModel):
+    transaction: TransactionResponse
+    username: str
+    new_balance: float
+
+
+class TransactionListItem(BaseModel):
+    id: str
+    username: str
+    amount: float
+    balance_after: float
+    note: str = "null"
+    created_at: datetime

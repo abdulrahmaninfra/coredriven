@@ -1,7 +1,9 @@
 import os
 import tempfile
 
-os.environ["DATABASE_NAME"] = os.path.join(tempfile.mkdtemp(), "test.db")
+_tmp_db = os.path.join(tempfile.mkdtemp(), "test.db")
+os.environ["DATABASE_NAME"] = _tmp_db
+os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db}"
 os.environ["PASSWORD_HASH_SECRET_KEY"] = "test-secret-key-that-is-longer-than-32-bytes"
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
@@ -50,7 +52,7 @@ def _admin_headers(client, username):
 
 def _create_user(client, admin_headers, username, balance=50.0):
     response = client.post(
-        "/auth/admin/register",
+        "/users",
         json={
             "username": username,
             "password": "secret123",
@@ -62,8 +64,8 @@ def _create_user(client, admin_headers, username, balance=50.0):
     assert response.status_code == 201, response.text
     if balance:
         response = client.put(
-            "/auth/admin/update",
-            json={"target_username": username, "balance": balance},
+            f"/users/{username}",
+            json={"balance": balance},
             headers=admin_headers,
         )
         assert response.status_code == 200, response.text
@@ -145,7 +147,7 @@ def test_created_workstation_can_host_session():
         )
 
         response = client.post(
-            "/sessions/start", json={"workstation_id": ws_id}, headers=headers
+            "/sessions", json={"workstation_id": ws_id}, headers=headers
         )
         assert response.status_code == 201, response.text
         assert response.json()["workstation_id"] == ws_id
@@ -154,14 +156,17 @@ def test_created_workstation_can_host_session():
 def test_admin_can_update_workstation():
     with TestClient(app) as client:
         headers = _admin_headers(client, "wsu_admin_5")
-        client.post(
-            "/workstations",
-            json={"name": "wsu-ws-7", "hourly_rate": 10.0},
-            headers=headers,
+        ws_id = (
+            client.post(
+                "/workstations",
+                json={"name": "wsu-ws-7", "hourly_rate": 10.0},
+                headers=headers,
+            )
+            .json()["id"]
         )
 
         response = client.put(
-            "/workstations?name=wsu-ws-7",
+            f"/workstations/{ws_id}",
             json={"name": "wsu-ws-7b", "hourly_rate": 15.5, "is_active": False},
             headers=headers,
         )
@@ -189,10 +194,13 @@ def test_update_validation():
                 _create_user(client, headers, "wsu_user_2", balance=0.0)["username"],
             )
         )
-        client.post(
-            "/workstations",
-            json={"name": "wsu-ws-8", "hourly_rate": 10.0},
-            headers=headers,
+        ws8_id = (
+            client.post(
+                "/workstations",
+                json={"name": "wsu-ws-8", "hourly_rate": 10.0},
+                headers=headers,
+            )
+            .json()["id"]
         )
         client.post(
             "/workstations",
@@ -203,7 +211,7 @@ def test_update_validation():
         # Unknown workstation -> 404.
         assert (
             client.put(
-                "/workstations?name=wsu-nope",
+                "/workstations/wsu-nope",
                 json={"hourly_rate": 20.0},
                 headers=headers,
             ).status_code
@@ -212,28 +220,26 @@ def test_update_validation():
 
         # Rename collision -> 409.
         response = client.put(
-            "/workstations?name=wsu-ws-8",
+            f"/workstations/{ws8_id}",
             json={"name": "wsu-ws-9"},
             headers=headers,
         )
         assert response.status_code == 409, response.text
 
-        # Bad rate / empty body / missing name -> 400.
-        for params, payload in (
-            ("name=wsu-ws-8", {"hourly_rate": 0}),
-            ("name=wsu-ws-8", {"hourly_rate": -3}),
-            ("name=wsu-ws-8", {"name": "   "}),
-            ("name=wsu-ws-8", {}),
-            ("", {"hourly_rate": 20.0}),
+        # Bad rate / empty body -> 400; missing id -> 405.
+        for path, payload, expected in (
+            (f"/workstations/{ws8_id}", {"hourly_rate": 0}, 400),
+            (f"/workstations/{ws8_id}", {"hourly_rate": -3}, 400),
+            (f"/workstations/{ws8_id}", {"name": "   "}, 400),
+            (f"/workstations/{ws8_id}", {}, 400),
+            ("/workstations", {"hourly_rate": 20.0}, 405),
         ):
-            response = client.put(
-                f"/workstations?{params}", json=payload, headers=headers
-            )
-            assert response.status_code == 400, (params, payload, response.text)
+            response = client.put(path, json=payload, headers=headers)
+            assert response.status_code == expected, (path, payload, response.text)
 
         # status is not user-editable: ignored, other fields still apply.
         response = client.put(
-            "/workstations?name=wsu-ws-8",
+            f"/workstations/{ws8_id}",
             json={"status": "occupied", "hourly_rate": 20.0},
             headers=headers,
         )
@@ -243,26 +249,29 @@ def test_update_validation():
 
         # Non-admin -> 403, anonymous -> 401.
         response = client.put(
-            "/workstations?name=wsu-ws-8",
+            f"/workstations/{ws8_id}",
             json={"hourly_rate": 30.0},
             headers=user_headers,
         )
         assert response.status_code == 403, response.text
         assert (
-            client.put("/workstations?name=wsu-ws-8", json={"hourly_rate": 30.0})
+            client.put(f"/workstations/{ws8_id}", json={"hourly_rate": 30.0})
         ).status_code == 401
 
 
 def test_admin_can_delete_idle_workstation():
     with TestClient(app) as client:
         headers = _admin_headers(client, "wsu_admin_7")
-        client.post(
-            "/workstations",
-            json={"name": "wsu-ws-10", "hourly_rate": 10.0},
-            headers=headers,
+        ws_id = (
+            client.post(
+                "/workstations",
+                json={"name": "wsu-ws-10", "hourly_rate": 10.0},
+                headers=headers,
+            )
+            .json()["id"]
         )
 
-        response = client.delete("/workstations?name=wsu-ws-10", headers=headers)
+        response = client.delete(f"/workstations/{ws_id}", headers=headers)
         assert response.status_code == 200, response.text
         assert response.json()["ended_session_id"] is None
 
@@ -272,12 +281,12 @@ def test_admin_can_delete_idle_workstation():
         }
         assert "wsu-ws-10" not in names
 
-        # Second delete -> 404; missing name -> 400.
+        # Second delete -> 404; missing id -> 405.
         assert (
-            client.delete("/workstations?name=wsu-ws-10", headers=headers).status_code
+            client.delete(f"/workstations/{ws_id}", headers=headers).status_code
             == 404
         )
-        assert client.delete("/workstations", headers=headers).status_code == 400
+        assert client.delete("/workstations", headers=headers).status_code == 405
 
 
 def test_delete_occupied_workstation_ends_session():
@@ -295,14 +304,14 @@ def test_delete_occupied_workstation_ends_session():
         )
         session_id = (
             client.post(
-                "/sessions/start",
+                "/sessions",
                 json={"workstation_id": ws_id},
                 headers=user_headers,
             )
             .json()["id"]
         )
 
-        response = client.delete("/workstations?name=wsu-ws-11", headers=admin)
+        response = client.delete(f"/workstations/{ws_id}", headers=admin)
         assert response.status_code == 200, response.text
         assert response.json()["ended_session_id"] == session_id
 
@@ -311,7 +320,7 @@ def test_delete_occupied_workstation_ends_session():
             client.get(f"/sessions/{session_id}", headers=admin).json()["status"]
             == "ended"
         )
-        assert client.get("/auth/users/me", headers=user_headers).json()["balance"] <= 50.0
+        assert client.get("/auth/me", headers=user_headers).json()["balance"] <= 50.0
         names = {
             ws["name"] for ws in client.get("/workstations", headers=admin).json()
         }
@@ -324,6 +333,6 @@ def test_delete_requires_admin():
         _create_user(client, admin, "wsu_user_4", balance=0.0)
         user_headers = _headers(_login(client, "wsu_user_4"))
 
-        response = client.delete("/workstations?name=wsu-ws-1", headers=user_headers)
+        response = client.delete("/workstations/wsu-ws-1", headers=user_headers)
         assert response.status_code == 403, response.text
-        assert client.delete("/workstations?name=wsu-ws-1").status_code == 401
+        assert client.delete("/workstations/wsu-ws-1").status_code == 401

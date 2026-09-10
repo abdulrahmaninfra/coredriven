@@ -10,9 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from src.api.errors import app_error_handler
-from src.api.routers.auth import admin as auth_admin_router
 from src.api.routers.auth import auth as authentication_router
 from src.api.routers.sessions import sessions as sessions_router
+from src.api.routers.transactions import transactions as transactions_router
+from src.api.routers.users import users as users_router
 from src.api.routers.workstations import workstations as workstations_router
 from src.core.config import get_settings
 from src.database.customers.database import create_db
@@ -50,8 +51,8 @@ def create_application() -> FastAPI:
     application.include_router(authentication_router)
     application.include_router(sessions_router)
     application.include_router(workstations_router)
-    application.include_router(auth_admin_router)
-
+    application.include_router(users_router)
+    application.include_router(transactions_router)
     return application
 
 
@@ -64,6 +65,4 @@ if __name__ == "__main__":
     from src.core.config import get_settings
 
     settings = get_settings()
-    uvicorn.run(
-        "main:app", host=settings.HOST, port=settings.PORT, reload=True
-    )
+    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=True)

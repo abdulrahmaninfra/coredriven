@@ -1,7 +1,9 @@
 import os
 import tempfile
 
-os.environ["DATABASE_NAME"] = os.path.join(tempfile.mkdtemp(), "test.db")
+_tmp_db = os.path.join(tempfile.mkdtemp(), "test.db")
+os.environ["DATABASE_NAME"] = _tmp_db
+os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db}"
 os.environ["PASSWORD_HASH_SECRET_KEY"] = "test-secret-key-that-is-longer-than-32-bytes"
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
@@ -51,7 +53,7 @@ def _admin_headers(client, username):
 
 def _create_user(client, admin_headers, username, balance=50.0):
     response = client.post(
-        "/auth/admin/register",
+        "/users",
         json={
             "username": username,
             "password": "secret123",
@@ -64,8 +66,8 @@ def _create_user(client, admin_headers, username, balance=50.0):
     assert response.json()["balance"] == 0.0
     if balance:
         response = client.put(
-            "/auth/admin/update",
-            json={"target_username": username, "balance": balance},
+            f"/users/{username}",
+            json={"balance": balance},
             headers=admin_headers,
         )
         assert response.status_code == 200, response.text
@@ -77,7 +79,7 @@ def test_admin_can_register_user_and_login():
         admin = _admin_headers(client, "adm_admin_1")
 
         response = client.post(
-            "/auth/admin/register",
+            "/users",
             json={
                 "username": "adm_alice",
                 "password": "secret123",
@@ -92,7 +94,7 @@ def test_admin_can_register_user_and_login():
         # Duplicate username conflicts.
         assert (
             client.post(
-                "/auth/admin/register",
+                "/users",
                 json={
                     "username": "adm_alice",
                     "password": "secret123",
@@ -106,12 +108,12 @@ def test_admin_can_register_user_and_login():
 
         # Funded by admin, the user can log in and read their profile.
         client.put(
-            "/auth/admin/update",
-            json={"target_username": "adm_alice", "balance": 50.0},
+            "/users/adm_alice",
+            json={"balance": 50.0},
             headers=admin,
         )
         token = _login(client, "adm_alice")
-        response = client.get("/auth/users/me", headers=_headers(token))
+        response = client.get("/auth/me", headers=_headers(token))
         assert response.status_code == 200
         assert response.json()["username"] == "adm_alice"
         assert response.json()["balance"] == 50.0
@@ -130,11 +132,11 @@ def test_register_requires_admin():
             "balance": 0.0,
         }
         response = client.post(
-            "/auth/admin/register", json=payload, headers=user_headers
+            "/users", json=payload, headers=user_headers
         )
         assert response.status_code == 403, response.text
 
-        assert client.post("/auth/admin/register", json=payload).status_code == 401
+        assert client.post("/users", json=payload).status_code == 401
 
 
 def test_login_wrong_password():
@@ -154,28 +156,28 @@ def test_update_self():
         headers = _headers(_login(client, "adm_dave"))
 
         response = client.put(
-            "/auth/update", json={"phone_number": "99999"}, headers=headers
+            "/auth/me", json={"phone_number": "99999"}, headers=headers
         )
         assert response.status_code == 200, response.text
         assert response.json()["phone_number"] == "99999"
 
         # No valid fields -> 400.
-        assert client.put("/auth/update", json={}, headers=headers).status_code == 400
+        assert client.put("/auth/me", json={}, headers=headers).status_code == 400
 
         # Privileged fields are not self-service: ignored, so still 400 and
         # the balance is unchanged.
         response = client.put(
-            "/auth/update", json={"balance": 9999.0}, headers=headers
+            "/auth/me", json={"balance": 9999.0}, headers=headers
         )
         assert response.status_code == 400, response.text
         assert (
-            client.get("/auth/users/me", headers=headers).json()["balance"] == 10.0
+            client.get("/auth/me", headers=headers).json()["balance"] == 10.0
         )
 
         # Password change works and the new password logs in.
         assert (
             client.put(
-                "/auth/update", json={"password": "newsecret123"}, headers=headers
+                "/auth/me", json={"password": "newsecret123"}, headers=headers
             ).status_code
             == 200
         )
@@ -191,16 +193,16 @@ def test_admin_update_targets_users():
 
         # Non-admins are rejected from the admin endpoint.
         response = client.put(
-            "/auth/admin/update",
-            json={"target_username": "adm_erin", "balance": 42.5},
+            "/users/adm_erin",
+            json={"balance": 42.5},
             headers=user_headers,
         )
         assert response.status_code == 403, response.text
 
-        # Admin funds another user by target.
+        # Admin funds another user by ID path.
         response = client.put(
-            "/auth/admin/update",
-            json={"target_username": "adm_erin", "balance": 42.5},
+            "/users/adm_erin",
+            json={"balance": 42.5},
             headers=admin,
         )
         assert response.status_code == 200, response.text
@@ -208,16 +210,16 @@ def test_admin_update_targets_users():
 
         # Unknown target -> 404.
         response = client.put(
-            "/auth/admin/update",
-            json={"target_username": "adm_nobody", "balance": 1.0},
+            "/users/adm_nobody",
+            json={"balance": 1.0},
             headers=admin,
         )
         assert response.status_code == 404, response.text
 
         # Rename collision -> 409.
         response = client.put(
-            "/auth/admin/update",
-            json={"target_username": "adm_erin", "username": "adm_fred"},
+            "/users/adm_erin",
+            json={"username": "adm_fred"},
             headers=admin,
         )
         assert response.status_code == 409, response.text
@@ -230,23 +232,15 @@ def test_admin_can_delete_user():
         user_headers = _headers(_login(client, "adm_gail"))
 
         # Non-admins cannot delete.
-        response = client.delete(
-            "/auth/admin/delete?username=adm_gail", headers=user_headers
-        )
+        response = client.delete("/users/adm_gail", headers=user_headers)
         assert response.status_code == 403, response.text
 
-        # Missing identifier -> 400.
-        response = client.delete("/auth/admin/delete", headers=admin)
-        assert response.status_code == 400, response.text
-
         # Unknown user -> 404.
-        response = client.delete(
-            "/auth/admin/delete?username=adm_nobody", headers=admin
-        )
+        response = client.delete("/users/adm_nobody", headers=admin)
         assert response.status_code == 404, response.text
 
         # Delete works and the user can no longer log in.
-        response = client.delete("/auth/admin/delete?username=adm_gail", headers=admin)
+        response = client.delete("/users/adm_gail", headers=admin)
         assert response.status_code == 200, response.text
         assert (
             client.post(

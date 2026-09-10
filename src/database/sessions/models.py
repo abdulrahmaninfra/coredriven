@@ -23,11 +23,14 @@ class Sessions(Base):
             "user_id",
             unique=True,
             sqlite_where=text("status = 'active'"),
+            postgresql_where=text("status = 'active'"),
         ),
         Index(
             "uq_sessions_active_workstation",
             "workstation_id",
             unique=True,
             sqlite_where=text("status = 'active'"),
+            postgresql_where=text("status = 'active'"),
         ),
     )
+
