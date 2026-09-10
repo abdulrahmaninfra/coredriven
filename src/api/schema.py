@@ -1,5 +1,4 @@
 from datetime import datetime
-from src.database.transactions.models import Transactions
 from pydantic import BaseModel, ConfigDict, Field
 
 
