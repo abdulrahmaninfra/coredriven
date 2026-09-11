@@ -13,12 +13,12 @@ class Settings(BaseSettings):
     API_DESCRIPTION: str = "POS and Internet Cafe management"
     API_VERSION: str = "0.1.0"
 
-    DATABASE_NAME: str 
+    DATABASE_NAME: str
     DATABASE_URL: str
 
 
-    HOST: str  
-    PORT: int 
+    HOST: str
+    PORT: int
 
     JWT_ALGORITHM: str
     PASSWORD_HASH_SECRET_KEY: str
@@ -27,7 +27,8 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: list[str] = ["*"]
     ALLOWED_METHODS: list[str] = ["GET", "POST", "PUT", "DELETE"]
 
-
+    FIRST_SUPERADMIN_EMAIL: str
+    FIRST_SUPERADMIN_PASSWORD: str
 
 
 @lru_cache
