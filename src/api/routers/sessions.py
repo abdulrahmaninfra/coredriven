@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from src.api.schema import SessionResponse, SessionStart
+from src.core.permissions import can_manage_sessions, require_session_management
 from src.core.security import get_current_user
 from src.database.customers.database import get_db
 from src.database.customers.models import Customer
@@ -46,7 +47,7 @@ def list_sessions(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid status '{status_filter}'. Must be one of: {', '.join(VALID_STATUSES)}.",
         )
-    if not current_user.is_admin:
+    if not can_manage_sessions(current_user):
         if user_id is not None and user_id != current_user.id:
             raise NotYourSessionError("You can only list your own sessions.")
         user_id = current_user.id
@@ -62,6 +63,6 @@ def get_session(
     current_user: Customer = Depends(get_current_user),
 ):
     session = GetSession(db).get_session_by_id(session_id)
-    if session.user_id != current_user.id and not current_user.is_admin:
-        raise NotYourSessionError("You are not authorized to view this session.")
+    if session.user_id != current_user.id:
+        require_session_management(current_user, "view this session.")
     return session

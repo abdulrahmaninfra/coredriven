@@ -17,6 +17,8 @@ class UserResponse(BaseModel):
     username: str
     phone_number: str
     balance: float
+    is_admin: bool = False
+    is_superadmin: bool = False
 
 
 class UserUpdate(BaseModel):
@@ -110,3 +112,37 @@ class TransactionListItem(BaseModel):
     balance_after: float
     note: str = "null"
     created_at: datetime
+
+
+class AdminPermissionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    can_manage_admins: bool = False
+    can_manage_users: bool = False
+    can_manage_workstations: bool = False
+    can_manage_billing: bool = False
+    read_only_billing: bool = False
+
+
+class AdminPermissionUpdate(BaseModel):
+    can_manage_admins: bool | None = None
+    can_manage_users: bool | None = None
+    can_manage_workstations: bool | None = None
+    can_manage_billing: bool | None = None
+    read_only_billing: bool | None = None
+
+
+class UserAdminUpdate(BaseModel):
+    is_admin: bool | None = None
+    is_superadmin: bool | None = None
+    permissions: AdminPermissionUpdate | None = None
+
+
+class UserAdminResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    username: str
+    is_admin: bool = False
+    is_superadmin: bool = False
+    permissions: AdminPermissionResponse | None = None

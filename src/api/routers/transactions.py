@@ -7,10 +7,10 @@ from src.api.schema import (
     TransactionResponse,
     TransactionResult,
 )
+from src.core.permissions import require_billing_read, require_billing_write
 from src.core.security import get_current_user
 from src.database.customers.database import get_db
 from src.database.customers.models import Customer
-from src.database.exceptions import NotAdminError
 from src.database.transactions.create import deduct, recharge
 from src.database.transactions.models import Transactions
 from src.database.transactions.read import GetTransactions
@@ -19,8 +19,7 @@ transactions = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 
 def _require_admin(current_user: Customer) -> None:
-    if not current_user.is_admin:
-        raise NotAdminError("Only admins can manage transactions.")
+    require_billing_write(current_user, "manage transactions.")
 
 
 def _with_usernames(db: Session, rows: list[Transactions]) -> list[TransactionListItem]:
@@ -83,7 +82,7 @@ def list_transactions(
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_user),
 ):
-    _require_admin(current_user)
+    require_billing_read(current_user, "list transactions.")
 
     query = GetTransactions(db)
     rows = query.for_user(username) if username else query.all()

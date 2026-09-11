@@ -50,9 +50,9 @@ def start_session(db: Session, user_id: str, workstation_id: str):
         raise UserAlreadyHasActiveSessionError("User already has an active session")
 
     start_time = datetime.now(UTC)
-    # Coerce through float: Numeric columns come back as Decimal, which does
-    # not support arithmetic with floats.
-    available_minutes = float(float(customer.balance) / float(workstation.hourly_rate)) * 60
+    available_minutes = (
+        float(float(customer.balance) / float(workstation.hourly_rate)) * 60
+    )
     end_time = start_time + timedelta(minutes=available_minutes)
 
     session = Sessions(

@@ -28,7 +28,9 @@ def _seed_admin(username):
             CreateNewUser(username, "secret123", f"555-{username}", 50.0).create_user(
                 db
             )
-        GetUser(db).get_user_by_username(username).is_admin = True
+        admin = GetUser(db).get_user_by_username(username)
+        admin.is_admin = True
+        admin.is_superadmin = True
         db.commit()
     finally:
         db.close()

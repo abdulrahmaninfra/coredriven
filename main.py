@@ -16,13 +16,20 @@ from src.api.routers.transactions import transactions as transactions_router
 from src.api.routers.users import users as users_router
 from src.api.routers.workstations import workstations as workstations_router
 from src.core.config import get_settings
-from src.database.customers.database import create_db
+from src.database.customers.database import SessionLocal, create_db
 from src.database.exceptions import AppError
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db()
+    db = SessionLocal()
+    try:
+        from src.database.customers.seed import ensure_first_superadmin
+
+        ensure_first_superadmin(db)
+    finally:
+        db.close()
     yield
 
 
