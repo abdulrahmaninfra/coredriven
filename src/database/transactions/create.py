@@ -17,11 +17,6 @@ def _get_user(db: Session, username: str) -> Customer:
 def _apply(
     db: Session, user: Customer, signed_amount: float, note: str | None
 ) -> Transactions:
-    """Apply one signed balance move and write its ledger row atomically.
-
-    The balance never goes negative: an overdraft is rejected before any
-    write happens, so a rejected move leaves no ledger row behind.
-    """
     current = float(user.balance)
     new_balance = round(current + signed_amount, 2)
     if new_balance < 0:
@@ -47,12 +42,10 @@ def _apply(
 def recharge(
     db: Session, username: str, amount: float, note: str | None = None
 ) -> Transactions:
-    """Cash counter: add cash to a customer's balance."""
     return _apply(db, _get_user(db, username), amount, note)
 
 
 def deduct(
     db: Session, username: str, amount: float, note: str | None = None
 ) -> Transactions:
-    """Cash counter: take cash out (corrections, payout at checkout)."""
     return _apply(db, _get_user(db, username), -amount, note)

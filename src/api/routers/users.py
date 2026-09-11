@@ -19,6 +19,14 @@ logger = logging.getLogger(__name__)
 users = APIRouter(prefix="/users", tags=["Users"])
 
 
+def _require_admin(current_user: Customer):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can manage users.",
+        )
+
+
 @users.post(
     "",
     response_model=UserResponse,
@@ -31,8 +39,7 @@ def register(
     current_user: Customer = Depends(get_current_user),
 ):
 
-    if not current_user.is_admin:
-        raise NotAdminError("Only admins can register new users.")
+    _require_admin(current_user)
 
     existing = GetUser(db).get_user_by_username(user_data.username)
     if existing:
@@ -76,8 +83,7 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_user),
 ):
-    if not current_user.is_admin:
-        raise NotAdminError("Only admins can list users.")
+    _require_admin(current_user)
 
     return GetUser(db).get_user(
         username=username,
@@ -96,9 +102,7 @@ def update_user(
     db: Session = Depends(get_db),
     current_user: Customer = Depends(get_current_user),
 ):
-    if not current_user.is_admin:
-        raise NotAdminError("Only admins can update user information.")
-
+    _require_admin(current_user)
     target = GetUser(db).get_by_identifier(user_id)
     if target is None:
         raise UserNotFoundError(f"User '{user_id}' not found.")
@@ -137,8 +141,7 @@ def delete_user(
     current_user: Customer = Depends(get_current_user),
 ):
 
-    if not current_user.is_admin:
-        raise NotAdminError("Only admins can delete users.")
+    _require_admin(current_user)
 
     target = GetUser(db).get_by_identifier(user_id)
     if target is None:

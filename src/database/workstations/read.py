@@ -17,7 +17,6 @@ class GetWorkstation:
         return self.db.query(Workstation).filter(Workstation.name == name).first()
 
     def get_by_identifier(self, identifier: str):
-        """Search by workstation id or name: id first, then name fallback."""
         ws = self.get_by_id(identifier)
         if ws is None:
             ws = self.get_by_name(identifier)
