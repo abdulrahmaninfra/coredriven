@@ -38,7 +38,9 @@ def _ensure_admin(client):
     try:
         if GetUser(db).get_user_by_username("txn_admin") is None:
             CreateNewUser("txn_admin", "secret123", "555-txn_admin", 50.0).create_user(db)
-        GetUser(db).get_user_by_username("txn_admin").is_admin = True
+        admin = GetUser(db).get_user_by_username("txn_admin")
+        admin.is_admin = True
+        admin.is_superadmin = True
         db.commit()
     finally:
         db.close()

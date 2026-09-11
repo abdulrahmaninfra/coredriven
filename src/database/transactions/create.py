@@ -54,11 +54,17 @@ def _move(
     signed_amount: float,
     note: str | None,
 ) -> Transactions:
+    # begin_nested() (SAVEPOINT) instead of begin(): the request session may
+    # already hold an autobegun transaction from earlier reads (e.g. the
+    # auth lookup in get_current_user), on which begin() would raise
+    # "A transaction is already begun on this Session". The savepoint still
+    # keeps the balance move all-or-nothing.
     try:
-        with db.begin():
+        with db.begin_nested():
             user = _get_user(db, username)
             row = _apply(db, user, signed_amount, note)
 
+        db.commit()
         db.refresh(row)
         return row
 

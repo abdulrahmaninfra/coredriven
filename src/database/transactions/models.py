@@ -7,6 +7,13 @@ from src.database.customers.database import Base
 
 
 class Transactions(Base):
+    """Cash-counter ledger: one row per balance move.
+
+    The amount is signed (+recharge, -deduct) so the table alone tells the
+    whole story, and balance_after snapshots the customer's balance right
+    after the move for auditing.
+    """
+
     __tablename__ = "transactions"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)

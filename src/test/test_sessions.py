@@ -54,7 +54,9 @@ def _ensure_admin(client):
             CreateNewUser(
                 "sess_admin", "secret123", "555-sess_admin", 50.0
             ).create_user(db)
-        GetUser(db).get_user_by_username("sess_admin").is_admin = True
+        admin = GetUser(db).get_user_by_username("sess_admin")
+        admin.is_admin = True
+        admin.is_superadmin = True
         db.commit()
     finally:
         db.close()
