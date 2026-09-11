@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from src.core.permissions import can_manage_sessions
 from src.database.customers.models import Customer
 from src.database.exceptions import (
     CustomerNotFoundError,
@@ -27,7 +28,7 @@ def end_session(db: Session, session_id: str, acted_by: Customer | None = None):
     if (
         acted_by is not None
         and session.user_id != acted_by.id
-        and not acted_by.is_admin
+        and not can_manage_sessions(acted_by)
     ):
         raise NotYourSessionError("You are not authorized to end this session.")
 

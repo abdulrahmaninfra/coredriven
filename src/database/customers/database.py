@@ -38,6 +38,7 @@ class Base(DeclarativeBase):
 
 def create_db():
     import src.database.customers.models as customer_models  # noqa: F401
+    import src.database.customers.permissions.models as permission_models  # noqa: F401
     import src.database.sessions.models as session_models  # noqa: F401
     import src.database.transactions.models as transaction_models  # noqa: F401
     import src.database.workstations.models as workstation_models  # noqa: F401
