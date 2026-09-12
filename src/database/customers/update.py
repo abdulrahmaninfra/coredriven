@@ -1,6 +1,6 @@
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-
+from decimal import Decimal
 from src.core.security import hash_password as _hash_password
 from src.database.customers.models import Customer
 
@@ -11,7 +11,7 @@ def UpdateUser(
     username: str | None = None,
     phone_number: str | None = None,
     password: str | None = None,
-    balance: float | None = None,
+    balance: Decimal | None = None,
     is_active: bool | None = None,
     user_id: str | None = None,
 ):

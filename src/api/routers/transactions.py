@@ -32,8 +32,8 @@ def _with_usernames(db: Session, rows: list[Transactions]) -> list[TransactionLi
         TransactionListItem(
             id=row.id,
             username=names.get(row.user_id, row.user_id),
-            amount=float(row.amount),
-            balance_after=float(row.balance_after),
+            amount=row.amount,
+            balance_after=row.balance_after,
             note=row.note,
             created_at=row.created_at,
         )
