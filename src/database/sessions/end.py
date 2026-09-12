@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 
+from decimal import ROUND_HALF_EVEN, Decimal
+
 from sqlalchemy.orm import Session
 
 from src.core.permissions import can_manage_sessions
@@ -43,11 +45,14 @@ def end_session(db: Session, session_id: str, acted_by: Customer | None = None):
     end_time = datetime.now(UTC)
     elapsed_hours = (end_time - _to_utc(session.start_time)).total_seconds() / 3600
 
-    hourly_rate = float(workstation.hourly_rate)
-    balance = float(customer.balance)
-    actual_cost = round(max(0.0, min(elapsed_hours * hourly_rate, balance)), 2)
+    _cent = Decimal("0.01")
+    hourly_rate = Decimal(str(workstation.hourly_rate))
+    balance = Decimal(str(customer.balance))
+    actual_cost = max(Decimal("0"), min(Decimal(str(elapsed_hours)) * hourly_rate, balance)).quantize(
+        _cent, rounding=ROUND_HALF_EVEN
+    )
 
-    customer.balance = round(balance - actual_cost, 2)
+    customer.balance = (balance - actual_cost).quantize(_cent, rounding=ROUND_HALF_EVEN)
     session.status = "ended"
     session.end_time = end_time
     session.cost = actual_cost

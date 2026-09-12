@@ -30,7 +30,10 @@ class Settings(BaseSettings):
     FIRST_SUPERADMIN_EMAIL: str
     FIRST_SUPERADMIN_PASSWORD: str
 
-
+        # Login brute-force protection (see src/core/rate_limit.py)
+    LOGIN_MAX_FAILED_ATTEMPTS: int = 5
+    LOGIN_WINDOW_SECONDS: int = 900
+    
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
