@@ -1,5 +1,5 @@
 import uuid
-
+from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.core.security import hash_password
@@ -7,7 +7,7 @@ from src.database.customers.models import Customer
 
 
 class CreateNewUser:
-    def __init__(self, username: str, password: str, phone_number: str, balance: float):
+    def __init__(self, username: str, password: str, phone_number: str, balance: Decimal):
         self.id = str(uuid.uuid4())
         self.username = username
         self.password = hash_password(password)

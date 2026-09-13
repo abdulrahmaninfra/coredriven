@@ -1,11 +1,22 @@
 import uuid
+from decimal import ROUND_HALF_EVEN, Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.database.customers.models import Customer
-from src.database.exceptions import InsufficientBalanceError, UserNotFoundError
+from src.database.exceptions import (
+    BalanceOverflowError,
+    InsufficientBalanceError,
+    UserNotFoundError,
+)
 from src.database.transactions.models import Transactions
+
+_CENT = Decimal("0.01")
+# Matches the Numeric(10, 2) balance column: at most 8 integer digits.
+# SQLite silently stores bigger values; Postgres would reject the INSERT,
+# so the cap is enforced in business logic on every balance move.
+_MAX_BALANCE = Decimal("99999999.99")
 
 
 def _get_user(db: Session, username: str) -> Customer:
@@ -22,22 +33,29 @@ def _get_user(db: Session, username: str) -> Customer:
 def _apply(
     db: Session,
     user: Customer,
-    signed_amount: float,
+    signed_amount: Decimal,
     note: str | None,
 ) -> Transactions:
-    current = float(user.balance)
-    new_balance = round(current + signed_amount, 2)
+    signed = signed_amount.quantize(_CENT, rounding=ROUND_HALF_EVEN)
+    current = Decimal(str(user.balance))
+    new_balance = (current + signed).quantize(_CENT, rounding=ROUND_HALF_EVEN)
 
     if new_balance < 0:
         raise InsufficientBalanceError(
-            f"Insufficient balance: cannot move {-signed_amount} "
+            f"Insufficient balance: cannot move {-signed} "
             f"from balance {current}."
+        )
+
+    if new_balance > _MAX_BALANCE:
+        raise BalanceOverflowError(
+            f"Balance overflow: {new_balance} would exceed "
+            f"the maximum balance of {_MAX_BALANCE}."
         )
 
     row = Transactions(
         id=str(uuid.uuid4()),
         user_id=user.id,
-        amount=round(signed_amount, 2),
+        amount=signed,
         balance_after=new_balance,
         note=note,
     )
@@ -51,7 +69,7 @@ def _apply(
 def _move(
     db: Session,
     username: str,
-    signed_amount: float,
+    signed_amount: Decimal,
     note: str | None,
 ) -> Transactions:
     # begin_nested() (SAVEPOINT) instead of begin(): the request session may
@@ -76,7 +94,7 @@ def _move(
 def recharge(
     db: Session,
     username: str,
-    amount: float,
+    amount: Decimal,
     note: str | None = None,
 ) -> Transactions:
     return _move(db, username, amount, note)
@@ -85,7 +103,7 @@ def recharge(
 def deduct(
     db: Session,
     username: str,
-    amount: float,
+    amount: Decimal,
     note: str | None = None,
 ) -> Transactions:
     return _move(db, username, -amount, note)

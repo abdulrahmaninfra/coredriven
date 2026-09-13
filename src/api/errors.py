@@ -19,6 +19,7 @@ from src.database.exceptions import (
     WorkstationNameTakenError,
     WorkstationNotFoundError,
     WorkstationUnavailableError,
+    BalanceOverflowError,
 )
 
 ERROR_STATUS_MAP: dict[type[AppError], int] = {
@@ -38,6 +39,7 @@ ERROR_STATUS_MAP: dict[type[AppError], int] = {
     WorkstationDeactivatedError: status.HTTP_409_CONFLICT,
     SessionNotActiveError: status.HTTP_409_CONFLICT,
     NotAdminError: status.HTTP_403_FORBIDDEN,
+    BalanceOverflowError: status.HTTP_400_BAD_REQUEST,
 }
 
 

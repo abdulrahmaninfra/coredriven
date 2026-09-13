@@ -11,6 +11,7 @@ from src.api.schema import (
     UserCreate,
     UserResponse,
     UserUpdate,
+    ZERO,
 )
 from src.core.permissions import is_superadmin, require_permission
 from src.core.security import get_current_user
@@ -58,7 +59,7 @@ def register(
             username=user_data.username,
             password=user_data.password,
             phone_number=user_data.phone_number,
-            balance=0.0,
+            balance=ZERO,
         ).create_user(db)
 
         if new_user is None:

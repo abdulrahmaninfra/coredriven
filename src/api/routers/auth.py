@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-
+from src.core.rate_limit import login_limiter
 from src.api.schema import SessionResponse, Token, UserResponse, UserSelfUpdate
 from src.core.security import create_access_token, get_current_user, verify_password
 from src.database.customers.database import get_db
@@ -19,9 +19,22 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
+    # Reject early when this username is locked out from failed attempts,
+    # before touching the database or leaking whether the user exists.
+    retry_after = login_limiter.retry_after_seconds(form_data.username)
+    if retry_after > 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Too many failed login attempts. "
+                f"Try again in {int(retry_after // 60) + 1} minute(s)."
+            ),
+        )
+
     user = GetUser(db).get_user_by_username(form_data.username)
 
     if user is None or not verify_password(form_data.password, user.password_hash):
+        login_limiter.record_failure(form_data.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password.",
@@ -34,6 +47,7 @@ def login(
             detail="This account has been deactivated.",
         )
 
+    login_limiter.record_success(form_data.username)
     access_token = create_access_token(data={"sub": user.username})
     return Token(access_token=access_token)
 

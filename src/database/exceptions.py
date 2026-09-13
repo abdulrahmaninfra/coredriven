@@ -67,3 +67,6 @@ class CustomerNotFoundError(AppError):
 
 class NotAdminError(AppError):
     pass
+
+class BalanceOverflowError(AppError):
+    pass
