@@ -1,45 +1,76 @@
-# AGENTS.md
+FastAPI + SQLAlchemy 2 (ORM) POS / internet-cafe API. SQLite by default, Postgres-ready. Package manager is uv; Python 3.14 (requires-python >= 3.14, .python-version). All imports are absolute src.* — launch from repo root.
 
-FastAPI + SQLAlchemy ORM POS / internet-cafe API (SQLite backend). Package manager is `uv`; Python 3.14 (`requires-python >= 3.14`, `.python-version`). All imports are absolute `src.*` — launch from repo root.
+Last verified against main @ bace37e (2026-09-13). If this file and the code disagree, the code wins — then fix this file.
 
-## Commands
+Commands
+bash
 
-```bash
+uv sync --frozen                    # install exactly what uv.lock pins
 uv run uvicorn main:app --port 9999 --reload   # dev server
-uv run ruff check .                                    # lint (CI runs this)
-uv run python -m pytest                                # tests (CI runs this)
-uv add <pkg>            # deps -> pyproject.toml + uv.lock
-uv add --dev <pkg>      # dev group (pytest, ruff, httpx2)
-uv sync --frozen        # CI install
-```
+uv run ruff check .                 # lint (CI runs this; currently 18 I001s, see Quirks)
+uv run python -m pytest             # tests — zero env vars / .env needed (conftest.py pins everything)
+uv run alembic upgrade head         # apply migrations
+uv run alembic revision --autogenerate -m "..."   # new migration after model changes
+uv run alembic check                # verify models match migrations (CI candidate)
+uv add <pkg>                        # deps -> pyproject.toml + uv.lock
+The FastAPI app instance in repo-root main.py is named app. Use main:app for uvicorn and from main import app for imports in tests.
+pytest is configured with pythonpath = ["src"]; tests are plain modules in src/test/.
+Environment / settings
+src/core/config.py uses pydantic-settings + load_dotenv(). Copy .env.example to .env for local runs. Required (no defaults):
 
-- The FastAPI app instance in repo-root `main.py` is named **`app`**. Use `main:app` for uvicorn and `from main import app` for imports in tests.
-- `pytest` is configured with `pythonpath = ["src"]`; no runner conflicts — tests are plain modules in `src/test/`.
-- (No longer relevant: the app was migrated from raw `sqlite3` to SQLAlchemy in commit `c34630a`.)
+DATABASE_NAME, DATABASE_URL, HOST, PORT, JWT_ALGORITHM, PASSWORD_HASH_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRE_MINUTES, FIRST_SUPERADMIN_EMAIL, FIRST_SUPERADMIN_PASSWORD
 
-## Environment / settings
+Optional: LOGIN_MAX_FAILED_ATTEMPTS (default 5), LOGIN_WINDOW_SECONDS (default 900), ALLOWED_ORIGINS / ALLOWED_METHODS.
 
-- `src/core/config.py` calls `load_dotenv()` and `Settings` has **no defaults** for `DATABASE_NAME`, `DATABASE_URL`, `HOST`, `PORT`, `JWT_ALGORITHM`, `PASSWORD_HASH_SECRET_KEY`, `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` — the app won't import without all of them (see `.env.example`).
-- The JWT signing secret is `PASSWORD_HASH_SECRET_KEY` (there is no `JWT_SECRET` field).
-- `get_settings()` is `lru_cache`d and `src/core/security.py` / `src/database/customers/database.py` read settings at **module import time**. Env changes need a fresh process.
-- Test pattern (follow it): set env vars at the top of the test module *before* importing `main`, e.g. `os.environ["DATABASE_NAME"] = tmp test db path`. Tests set only `DATABASE_NAME`/JWT vars; remaining required fields still fall through to the real `.env` via `load_dotenv()`, so they are not fully isolated from it.
+Gotchas:
 
-## Architecture
+get_settings() is lru_cached and read at module import time (security.py, database.py, rate_limit.py). Env changes need a fresh process.
+PASSWORD_HASH_SECRET_KEY is misleadingly named: argon2 salts itself; this value is the JWT HMAC signing secret.
+FIRST_SUPERADMIN_EMAIL is used as the superadmin username (there is no email column on Customer).
+DATABASE_URL accepts a full SQLAlchemy URL; if it doesn't start with a known dialect it falls back to sqlite:///{DATABASE_NAME}.
+Architecture
+text
 
-- `main.py` (repo root) = app factory `create_application()` producing the `app` instance + middleware, wires routers and the exception handler; `if __name__ == "__main__"` serves with uvicorn via `uv run python main.py`.
-- `src/api/` — FastAPI routers (`routers/auth.py` = `auth` + admin-only `admin` routers, `routers/sessions.py`, `routers/workstations.py` = routers; `errors.py` = `AppError` → HTTP status mapping + handler; `schema.py` = pydantic models).
-- `src/core/` — `config.py` (settings), `security.py` (argon2 via passlib, JWT via PyJWT, `get_current_user`, `oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")`).
-- `src/database/` — SQLAlchemy layer:
-  - `customers/database.py` — `engine`, `SessionLocal`, `Base`, `create_db()`, and the `get_db` dependency yielding a `Session`. Engine URL resolved by `_resolve_database_url()`: if `DATABASE_URL` starts with a known dialect (`sqlite`, `postgres`, `mysql`, …) it is used as-is, otherwise it falls back to `sqlite:///{DATABASE_NAME}`. `connect_args["check_same_thread"] = False` only for SQLite.
-  - `customers/models.py` — `Customer` ORM model (`customers` table, `id` = `String` PK supplied as `uuid4` by callers).
-  - `customers/create.py` / `read.py` / `update.py` / `delete.py` — classes `CreateNewUser`, `GetUser`, `UpdateUser`, `DeleteUser`; take the `Session` and return ORM instances/booleans.
-  - `sessions/` — `models.py` (`Sessions` ORM model), `start.py` / `end.py` (`start_session`, `end_session`), `read.py` (`GetSession` with filters + `get_session_by_id`).
-  - `workstations/` — `models.py` (`Workstation` ORM model), `read.py` (`GetWorkstation`).
-  - `exceptions.py` — domain error hierarchy rooted at `AppError` (`UserNotFoundError`, `WorkstationUnavailableError`, `SessionNotFoundError`, `CustomerNotFoundError`, etc.); raised by the DB layer and translated to HTTP by `src/api/errors.py`.
-- `create_db()` runs in the app lifespan (`Base.metadata.create_all`). New tables go on `Base` in the relevant `models.py`; schema changes are not migrated (no Alembic).
-- Endpoints: auth (`/auth`): `POST /login` (OAuth2 form-encoded, `OAuth2PasswordRequestForm`), `POST /logout` (Bearer, ends caller's active session, idempotent), `PUT /update` (Bearer, self phone/password only), `GET /users/me` (Bearer); admin (`/auth/admin`, `Customer.is_admin` else 403): `POST /register` (balance forced 0), `PUT /update` (`target_username` selects user, else self), `DELETE /delete` (`?username=`/`?phone_number=`). Sessions (`/sessions`, all Bearer, self-scoped unless `Customer.is_admin`): `POST /sessions/start`, `POST /sessions/{session_id}/end`, `GET /sessions`, `GET /sessions/{session_id}`. Workstations (`/workstations`): `GET /workstations` (Bearer), `POST /workstations` (admin-only), `PUT /workstations?name=` (admin-only, `status` not editable), `DELETE /workstations?name=` (admin-only, force-ends active session with billing). Docs at `docs/auth.md` and `docs/sqlalchemy-migration-plan.md`.
+main.py                     app factory create_application(); lifespan: create_db() + seed first superadmin
+src/api/routers/            auth, users, workstations, sessions, transactions (thin: validate + delegate)
+src/api/schema.py           pydantic request/response models (money = Money/PositiveMoney = Decimal, 2dp)
+src/api/errors.py           AppError -> HTTP status map + global handler
+src/core/                   security (JWT + argon2), permissions (RBAC), rate_limit, config
+src/database/<domain>/      one package per domain: models/read/create/update/delete
+migrations/                 Alembic environment; initial revision d05a84907f4e
+DB infrastructure (Base, engine, SessionLocal, create_db) lives in src/database/customers/database.py — historic; every domain imports from there.
+Startup calls create_db() (create_all) and Alembic exists for real schema management — after changing a model, generate a migration; don't rely on create_all.
+All timestamps are naive UTC (SQLite CURRENT_TIMESTAMP, 1-second resolution).
+API surface (all JSON except login)
+Router
+Endpoints
+auth	POST /auth/login (OAuth2 form: username+password) → {access_token}; GET /auth/me; PUT /auth/me (self-update: phone/password); POST /auth/logout
+users	POST /users (admin: can_manage_users); GET /users (limit/offset); PUT /users/{id} (id or username); DELETE /users/{id}; GET /users/{id}/permissions (can_manage_admins); PUT /users/{id}/admin (role + permission flags)
+workstations	GET /workstations; POST /workstations; PUT /workstations/{id}; DELETE /workstations/{id} (all write ops: can_manage_workstations)
+sessions	POST /sessions (start; needs balance > 0); POST /sessions/{id}/end (charges cost); GET /sessions (filters: user_id, workstation_id, status=active|ended); GET /sessions/{id}
+transactions	POST /transactions/recharge; POST /transactions/deduct (can_manage_billing; body: target_username, amount > 0, note?); GET /transactions (billing-read; username, limit)
 
-## Conventions / CI
+Auth & permissions
+JWT bearer tokens (Authorization: Bearer ...), OAuth2PasswordBearer on /auth/login.
+Passwords: argon2 hashes.
+RBAC: is_superadmin bypasses everything; sub-admins need is_admin plus a row in AdminPermission with granular flags: can_manage_admins, can_manage_users, can_manage_workstations, can_manage_billing (+ read_only_billing for read-only ledger access).
+Login rate limiting: in-memory fixed window keyed by username — after LOGIN_MAX_FAILED_ATTEMPTS failures within LOGIN_WINDOW_SECONDS, all login attempts for that username (correct password included) get 429 until the window expires. Successful login clears the counter. Single-process only.
+Money
+All money is Decimal quantized to 2 dp (Money, PositiveMoney in schema.py); JSON still serializes as numbers.
+Balance math: ROUND_HALF_EVEN; balances capped at 99999999.99 — exceeding it raises a domain error mapped to 400 (guards SQLite's silent column overflow).
+Recharge/deduct are atomic (SAVEPOINT via begin_nested()); the transactions table is a signed-amount ledger with balance_after snapshots.
+Errors
+Domain errors (AppError subclasses in src/database/exceptions.py) are mapped to HTTP statuses in src/api/errors.py::ERROR_STATUS_MAP (404/400/403/409). Raise domain errors in new code; avoid raw HTTPException (a few legacy spots still use it — don't copy that). Unknown AppError types default to 400.
 
-- CI (`.github/workflows/gh.yml`) runs ruff + pytest on push/PR to `main`, `fit/**`, `fix/**`; commit messages use `type:` prefixes (`refactor:`, `fix:`, `test:`, `style:`, `chore:`).
-- Ruff ignores `B008` (Depends in defaults — idiomatic FastAPI) and `BLE001` (broad except for error normalization); keep those patterns, don't "fix" them.
+Testing
+src/test/conftest.py pins all Settings env vars into a temp SQLite DB and resets the login limiter around every test — uv run python -m pytest works with zero configuration.
+Conventions: per-module username prefixes (sess_*, adm_*, …) because all modules share one DB (settings are lru_cached); use with TestClient(app) as client so the lifespan runs; admins are created directly via CreateNewUser + flag flips, then logged in through POST /auth/login (form-encoded).
+Current suite: 40 tests. New test modules set nothing themselves — conftest handles it.
+Known quirks (verify before "fixing" — some are pending decisions)
+note fields default to the literal string "null" in schema.py (not None) — stored that way in the ledger.
+UserCreate.balance is accepted but ignored (new users always start at 0).
+Balance top-ups via PUT /users/{id} do not create ledger rows — ledger and balance can diverge.
+UserCharge in schema.py is dead code.
+Model classes Sessions/Transactions are plural (rest are singular); UpdateUser is a PascalCase function.
+transactions listing loads all rows then slices in Python (no SQL-level pagination yet).
+Deleting a user does not guard against existing sessions/transactions (FK enforcement off in SQLite) — verify before assuming cascade behavior.
